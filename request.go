@@ -1,11 +1,17 @@
 package gremgo
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 
 	"github.com/satori/go.uuid"
 )
+
+const mimeTypeStr = "application/vnd.gremlin-v3.0+json"
+
+// create the header as []byte with the length byte as prefix
+var mimeTypePrefix = append([]byte{byte(len(mimeTypeStr))}, []byte(mimeTypeStr)...)
 
 type requester interface {
 	prepare() error
@@ -22,10 +28,9 @@ type request struct {
 }
 
 // prepareRequest packages a query and binding into the format that Gremlin Server accepts
-func prepareRequest(query string) (req request, id string, err error) {
+func prepareRequest(query string, bindings, rebindings map[string]string) (req request, id string, err error) {
 	var uuID uuid.UUID
-	uuID, err = uuid.NewV4()
-	if err != nil {
+	if uuID, err = uuid.NewV4(); err != nil {
 		return
 	}
 	id = uuID.String()
@@ -37,28 +42,10 @@ func prepareRequest(query string) (req request, id string, err error) {
 	req.Args = make(map[string]interface{})
 	req.Args["language"] = "gremlin-groovy"
 	req.Args["gremlin"] = query
-
-	return
-}
-
-// prepareRequest packages a query and binding into the format that Gremlin Server accepts
-func prepareRequestWithBindings(query string, bindings, rebindings map[string]string) (req request, id string, err error) {
-	var uuID uuid.UUID
-	uuID, err = uuid.NewV4()
-	if err != nil {
-		return
+	if len(bindings) > 0 || len(rebindings) > 0 {
+		req.Args["bindings"] = bindings
+		req.Args["rebindings"] = rebindings
 	}
-	id = uuID.String()
-
-	req.RequestID = id
-	req.Op = "eval"
-	req.Processor = ""
-
-	req.Args = make(map[string]interface{})
-	req.Args["language"] = "gremlin-groovy"
-	req.Args["gremlin"] = query
-	req.Args["bindings"] = bindings
-	req.Args["rebindings"] = rebindings
 
 	return
 }
@@ -84,20 +71,26 @@ func prepareAuthRequest(requestID string, username string, password string) (req
 	return
 }
 
-// formatMessage takes a request type and formats it into being able to be delivered to Gremlin Server
+// packageRequest takes a request type and formats it into being able to be delivered to Gremlin Server
 func packageRequest(req request) (msg []byte, err error) {
 	j, err := json.Marshal(req) // Formats request into byte format
 	if err != nil {
 		return
 	}
-	mimeType := []byte("application/vnd.gremlin-v3.0+json")
-	msg = append([]byte{0x21}, mimeType...) //0x21 is the fixed length of mimeType in hex
-	msg = append(msg, j...)
-
-	return
+	return append(mimeTypePrefix, j...), nil
 }
 
-// dispactchRequest sends the request for writing to the remote Gremlin Server
+// dispatchRequest sends the request for writing to the remote Gremlin Server
 func (c *Client) dispatchRequest(msg []byte) {
 	c.requests <- msg
+}
+
+// dispatchRequestCtx sends the request for writing to the remote Gremlin Server
+func (c *Client) dispatchRequestCtx(ctx context.Context, msg []byte) (err error) {
+	select {
+	case c.requests <- msg:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	return
 }

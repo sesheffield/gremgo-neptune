@@ -1,13 +1,20 @@
 package gremgo
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"reflect"
 	"sync"
 	"time"
 
+	"github.com/gedge/gremgo-neptune/graphson"
+	gutil "github.com/gedge/gremgo-neptune/utils"
 	"github.com/pkg/errors"
 )
+
+var ErrorConnectionDisposed = errors.New("you cannot write on a disposed connection")
 
 // Client is a container for the gremgo client.
 type Client struct {
@@ -41,7 +48,7 @@ func NewDialer(host string, configs ...DialerConfig) (dialer *Ws) {
 
 func newClient() (c Client) {
 	c.requests = make(chan []byte, 3)  // c.requests takes any request and delivers it to the WriteWorker for dispatch to Gremlin Server
-	c.responses = make(chan []byte, 3) // c.responses takes raw responses from ReadWorker and delivers it for sorting to handelResponse
+	c.responses = make(chan []byte, 3) // c.responses takes raw responses from ReadWorker and delivers it for sorting to handleResponse
 	c.results = &sync.Map{}
 	c.responseNotifier = &sync.Map{}
 	return
@@ -49,32 +56,36 @@ func newClient() (c Client) {
 
 // Dial returns a gremgo client for interaction with the Gremlin Server specified in the host IP.
 func Dial(conn dialer, errs chan error) (c Client, err error) {
+	return DialCtx(context.Background(), conn, errs)
+}
+
+// DialCtx returns a gremgo client for interaction with the Gremlin Server specified in the host IP.
+func DialCtx(ctx context.Context, conn dialer, errs chan error) (c Client, err error) {
 	c = newClient()
 	c.conn = conn
 
 	// Connects to Gremlin Server
-	err = conn.connect()
+	err = conn.connectCtx(ctx)
 	if err != nil {
 		return
 	}
 
-	quit := conn.(*Ws).quit
+	// quit := conn.(*Ws).quit
 
-	go c.writeWorker(errs, quit)
-	go c.readWorker(errs, quit)
-	go conn.ping(errs)
+	go c.writeWorkerCtx(ctx, errs)
+	go c.readWorkerCtx(ctx, errs)
+	go conn.pingCtx(ctx, errs)
 
 	return
 }
 
-func (c *Client) executeRequest(query string, bindings, rebindings *map[string]string) (resp []Response, err error) {
+func (c *Client) executeRequest(query string, bindings, rebindings map[string]string) (resp []Response, err error) {
+	return c.executeRequestCtx(context.Background(), query, bindings, rebindings)
+}
+func (c *Client) executeRequestCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	var req request
 	var id string
-	if bindings != nil && rebindings != nil {
-		req, id, err = prepareRequestWithBindings(query, *bindings, *rebindings)
-	} else {
-		req, id, err = prepareRequest(query)
-	}
+	req, id, err = prepareRequest(query, bindings, rebindings)
 	if err != nil {
 		return
 	}
@@ -85,8 +96,8 @@ func (c *Client) executeRequest(query string, bindings, rebindings *map[string]s
 		return
 	}
 	c.responseNotifier.Store(id, make(chan error, 1))
-	c.dispatchRequest(msg)
-	resp, err = c.retrieveResponse(id)
+	c.dispatchRequestCtx(ctx, msg)
+	resp, err = c.retrieveResponseCtx(ctx, id)
 	if err != nil {
 		err = errors.Wrapf(err, "query: %s", query)
 	}
@@ -110,28 +121,19 @@ func (c *Client) authenticate(requestID string) (err error) {
 	return
 }
 
-// ExecuteWithBindings formats a raw Gremlin query, sends it to Gremlin Server, and returns the result.
-func (c *Client) ExecuteWithBindings(query string, bindings, rebindings map[string]string) (resp []Response, err error) {
-	if c.conn.isDisposed() {
-		return resp, errors.New("you cannot write on disposed connection")
-	}
-	resp, err = c.executeRequest(query, &bindings, &rebindings)
-	return
-}
-
 // Execute formats a raw Gremlin query, sends it to Gremlin Server, and returns the result.
-func (c *Client) Execute(query string) (resp []Response, err error) {
+func (c *Client) Execute(query string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	if c.conn.isDisposed() {
-		return resp, errors.New("you cannot write on disposed connection")
+		return resp, ErrorConnectionDisposed
 	}
-	resp, err = c.executeRequest(query, nil, nil)
+	resp, err = c.executeRequest(query, bindings, rebindings)
 	return
 }
 
 // ExecuteFile takes a file path to a Gremlin script, sends it to Gremlin Server, and returns the result.
 func (c *Client) ExecuteFile(path string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	if c.conn.isDisposed() {
-		return resp, errors.New("you cannot write on disposed connection")
+		return resp, ErrorConnectionDisposed
 	}
 	d, err := ioutil.ReadFile(path) // Read script from file
 	if err != nil {
@@ -139,8 +141,202 @@ func (c *Client) ExecuteFile(path string, bindings, rebindings map[string]string
 		return
 	}
 	query := string(d)
-	resp, err = c.executeRequest(query, &bindings, &rebindings)
+	resp, err = c.executeRequest(query, bindings, rebindings)
 	return
+}
+
+// Get formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
+func (c *Client) Get(query string, ptr interface{}) (res []graphson.Vertex, err error) {
+	return c.GetCtx(context.Background(), query, ptr)
+}
+func (c *Client) GetCtx(ctx context.Context, query string, ptr interface{}) (res []graphson.Vertex, err error) {
+	if c.conn.isDisposed() {
+		err = ErrorConnectionDisposed
+		return
+	}
+
+	gutil.Dump("GetQ ", query)
+	var resp []Response
+	resp, err = c.executeRequest(query, nil, nil)
+	if err != nil {
+		return
+	}
+	gutil.Dump("GetRes ", resp)
+	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
+		gutil.Warn("no results")
+		return
+	}
+
+	for _, item := range resp {
+		resN, err := graphson.DeserializeListOfVerticesFromBytes(item.Result.Data)
+		if err != nil {
+			panic(err)
+		}
+		// resN := make([]graphson.Vertex, 1)
+		// gutil.Dump(fmt.Sprintf("DLoV%02d ", idx), resN)
+		res = append(res, resN...)
+	}
+	// 	gutil.Dump("GetZ ", strct)
+	return
+}
+
+// GetE formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
+func (c *Client) GetE(query string) (res graphson.Edges, err error) {
+	if c.conn.isDisposed() {
+		err = ErrorConnectionDisposed
+		return
+	}
+
+	gutil.Dump("GetEq ", query)
+	resp, err := c.executeRequest(query, nil, nil)
+	if err != nil {
+		return
+	}
+	gutil.Dump("GetERes ", resp)
+	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
+		gutil.Warn("no results")
+		return
+	}
+
+	for idx, item := range resp {
+		var resN graphson.Edges
+		if resN, err = graphson.DeserializeListOfEdgesFromBytes(item.Result.Data); err != nil {
+			return
+		}
+		gutil.Dump(fmt.Sprintf("DLoE%02d ", idx), resN)
+		res = append(res, resN...)
+	}
+
+	return
+}
+
+// GremlinForVertex returns the addV()... and V()... gremlin commands for `data`
+// Because of possible multiples, it does not start with `g.` (it probably should XXX )
+func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, err error) {
+
+	d := reflect.ValueOf(data)
+	var id reflect.Value
+	var missingId bool
+	if id = d.FieldByName("Id"); !id.IsValid() {
+		missingId = true
+		// err = errors.New("the passed interface must have an Id field")
+		// return
+	}
+
+	gremAdd = fmt.Sprintf("addV('%s')", label)
+	gremGet = fmt.Sprintf("V('%s')", label)
+
+	if !missingId {
+		gremAdd = fmt.Sprintf("%s.property(id,'%s')", gremAdd, id)
+		gremGet = fmt.Sprintf("%s.hasId('%s')", gremGet, id)
+	}
+
+	// missingTag := true
+
+	for i := 0; i < d.NumField(); i++ {
+		tag := d.Type().Field(i).Tag.Get("graph")
+		name, opts := parseTag(tag)
+		if len(name) == 0 && len(opts) == 0 {
+			// gutil.Warn("no opts for field %q with label %q data %+v", d.Type().Field(i).Name, label, data)
+			continue
+		}
+		// missingTag = false
+		val := d.Field(i).Interface()
+		if len(opts) == 0 {
+			err = fmt.Errorf("interface field tag does not contain a tag option type, field type: %T", val)
+			return
+		}
+		if !d.Field(i).IsValid() {
+			gutil.Warn("invalid field for label %q name %q data %+v", label, name, data)
+			continue
+		}
+		if opts.Contains("id") {
+			if val != "" {
+				gremAdd = fmt.Sprintf("%s.property(id,'%s')", gremAdd, val)
+				gremGet = fmt.Sprintf("%s.hasId('%s')", gremGet, val)
+			}
+		} else if opts.Contains("string") {
+			if val != "" {
+				gremAdd = fmt.Sprintf("%s.property('%s','%s')", gremAdd, name, val)
+				gremGet = fmt.Sprintf("%s.has('%s','%s')", gremGet, name, val)
+			}
+		} else if opts.Contains("bool") || opts.Contains("number") || opts.Contains("other") {
+			gremAdd = fmt.Sprintf("%s.property('%s',%v)", gremAdd, name, val)
+			gremGet = fmt.Sprintf("%s.has('%s',%v)", gremGet, name, val)
+		} else if opts.Contains("[]string") {
+			s := reflect.ValueOf(val)
+			for i := 0; i < s.Len(); i++ {
+				gremAdd = fmt.Sprintf("%s.property('%s','%s')", gremAdd, name, s.Index(i).Interface())
+				gremGet = fmt.Sprintf("%s.has('%s','%s')", gremGet, name, s.Index(i).Interface())
+			}
+		} else if opts.Contains("[]bool") || opts.Contains("[]number") || opts.Contains("[]other") {
+			s := reflect.ValueOf(val)
+			for i := 0; i < s.Len(); i++ {
+				gremAdd = fmt.Sprintf("%s.property('%s',%v)", gremAdd, name, s.Index(i).Interface())
+				gremGet = fmt.Sprintf("%s.has('%s',%v)", gremGet, name, s.Index(i).Interface())
+			}
+		} else {
+			err = fmt.Errorf("interface field tag needs recognised option, field: %q, tag: %q", d.Type().Field(i).Name, tag)
+			return
+		}
+	}
+
+	// if missingTag {
+	// 	err = fmt.Errorf("interface of type: %T, does not contain any graph tags", data)
+	// 	return
+	// }
+	return
+}
+
+// AddV takes a label and an interface and adds it as a vertex to the graph
+func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err error) {
+	if c.conn.isDisposed() {
+		return vert, ErrorConnectionDisposed
+	}
+
+	q, _, err := GremlinForVertex(label, data)
+	if err != nil {
+		panic(err) // XXX
+	}
+	q = "g." + q
+
+	gutil.Dump("addvq ", q)
+	var resp []Response
+	resp, err = c.Execute(q, nil, nil)
+	if err != nil {
+		panic(err) // XXX
+	}
+
+	if len(resp) != 1 {
+		return vert, fmt.Errorf("AddV should receive 1 response, got %d", len(resp))
+	}
+
+	for idx, res := range resp { // XXX one result, so do not need this
+		result, err := graphson.DeserializeListOfVerticesFromBytes(res.Result.Data)
+		if err != nil {
+			panic(err) // XXX
+		}
+		if len(result) != 1 {
+			return vert, fmt.Errorf("AddV should receive 1 result, got %d", len(result))
+		}
+
+		gutil.Dump(fmt.Sprintf("aV%02d ", idx), result)
+		vert = result[0]
+	}
+	return
+}
+
+// AddE takes a label, from UUID and to UUID then creates a edge between the two vertex in the graph
+func (c *Client) AddE(label string, fromId, toId string) (resp interface{}, err error) {
+	if c.conn.isDisposed() {
+		return nil, ErrorConnectionDisposed
+	}
+
+	q := fmt.Sprintf("g.addE('%s').from(g.V().hasId('%s')).to(g.V().hasId('%s')).property('%s','%s')", label, fromId, toId, "ook", "foo")
+	gutil.Warn(q)
+	resp, err = c.Execute(q, nil, nil)
+	return
+
 }
 
 // Close closes the underlying connection and marks the client as closed.

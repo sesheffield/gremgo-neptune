@@ -1,8 +1,11 @@
 package gremgo
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+
+	gutil "github.com/gedge/gremgo-neptune/utils"
 )
 
 const (
@@ -46,8 +49,9 @@ func (r Response) ToString() string {
 }
 
 func (c *Client) handleResponse(msg []byte) (err error) {
-	resp, err := marshalResponse(msg)
-
+	var resp Response
+	resp, err = marshalResponse(msg)
+	// err = errors.New("ook")
 	if resp.Status.Code == statusAuthenticate { //Server request authentication
 		return c.authenticate(resp.RequestID)
 	}
@@ -75,11 +79,12 @@ func (c *Client) saveResponse(resp Response, err error) {
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
 		container = existingData.([]interface{})
+		gutil.Dump("more for requestID: %s len: %d data: %v", resp.RequestID, len(resp.Result.Data), resp.Result.Data)
 	}
 	newdata := append(container, resp)       // Create new data container with new data
 	c.results.Store(resp.RequestID, newdata) // Add new data to buffer for future retrieval
-	respNotifier, load := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
-	_ = load
+	respNotifier, _ := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
+	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
 	if resp.Status.Code != statusPartialContent {
 		respNotifier.(chan error) <- err
 	}
@@ -104,13 +109,39 @@ func (c *Client) retrieveResponse(id string) (data []Response, err error) {
 	return
 }
 
-// deleteRespones deletes the response from the container. Used for cleanup purposes by requester.
+// retrieveResponseCtx retrieves the response saved by saveResponse.
+func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Response, err error) {
+	respNotifier, _ := c.responseNotifier.Load(id)
+	select {
+	case err = <-respNotifier.(chan error):
+		if err != nil {
+			return
+		}
+		if dataI, ok := c.results.Load(id); ok {
+			d := dataI.([]interface{})
+			data = make([]Response, len(d))
+			for i := range d {
+				data[i] = d[i].(Response)
+			}
+			close(respNotifier.(chan error))
+			c.responseNotifier.Delete(id)
+			c.deleteResponse(id)
+		} else {
+			err = fmt.Errorf("no results loaded for id: %s", id)
+		}
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	return
+}
+
+// deleteResponse deletes the response from the container. Used for cleanup purposes by requester.
 func (c *Client) deleteResponse(id string) {
 	c.results.Delete(id)
 	return
 }
 
-// responseDetectError detects any possible errors in responses from Gremlin Server and generates an error for each code
+// detectError detects any possible errors in responses from Gremlin Server and generates an error for each code
 func (r *Response) detectError() (err error) {
 	switch r.Status.Code {
 	case statusSuccess, statusNoContent, statusPartialContent:
