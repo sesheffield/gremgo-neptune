@@ -73,9 +73,11 @@ func DialCtx(ctx context.Context, conn dialer, errs chan error) (c Client, err e
 	}
 
 	// quit := conn.(*Ws).quit
+	msgChan := make(chan []byte, 200)
 
 	go c.writeWorkerCtx(ctx, errs)
-	go c.readWorkerCtx(ctx, errs)
+	go c.readWorkerCtx(ctx, msgChan, errs)
+	go c.saveWorkerCtx(ctx, msgChan, errs)
 	// go c.readWorker(errs, quit)
 	go conn.pingCtx(ctx, errs)
 
@@ -219,7 +221,9 @@ func (c *Client) GetCursorCtx(ctx context.Context, query string, ptr interface{}
 	return
 }
 
-// NextCursorCtx returns the next set of results for the cursor (eof will be true when no more results are available)
+// NextCursorCtx returns the next set of results for the cursor
+// - `res` may be empty when results were read by a previous call
+// - `eof` will be true when no more results are available
 func (c *Client) NextCursorCtx(ctx context.Context, cursor string) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {

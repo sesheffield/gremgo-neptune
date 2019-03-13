@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gutil "github.com/gedge/gremgo-neptune/utils"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -47,6 +48,19 @@ type Response struct {
 // ToString returns a string representation of the Response struct
 func (r Response) ToString() string {
 	return fmt.Sprintf("Response \nRequestID: %v, \nStatus: {%#v}, \nResult: {%#v}\n", r.RequestID, r.Status, r.Result)
+}
+
+func (c *Client) saveWorkerCtx(ctx context.Context, msgChan chan []byte, errs chan error) {
+	for {
+		select {
+		case msg := <-msgChan:
+			if err := c.handleResponse(msg); err != nil {
+				errs <- errors.Wrapf(err, "saveWorkerCtx: handleResponse error")
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (c *Client) handleResponse(msg []byte) (err error) {
@@ -94,7 +108,7 @@ func (c *Client) saveResponse(resp Response, err error) {
 	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
 	if resp.Status.Code == statusPartialContent {
 		if chunkNotifier, ok := c.chunkNotifier.Load(resp.RequestID); ok {
-			gutil.Warn("%s %s chunk", time.Now(), resp.RequestID[:3])
+			// gutil.Warn("%s %s chunk", time.Now(), resp.RequestID[:3])
 			chunkNotifier.(chan bool) <- true
 		}
 	} else {
@@ -143,6 +157,7 @@ func (c *Client) cleanResults(id string, respNotifier chan error, chunkNotifier 
 	close(respNotifier)
 	if chunkNotifier != nil {
 		close(chunkNotifier)
+		gutil.WarnLev(1, "%s %s chunkNotifier DELETED", time.Now(), id[:3])
 		c.chunkNotifier.Delete(id)
 	}
 	c.deleteResponse(id)
@@ -202,7 +217,7 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data [
 // deleteResponse deletes the response from the container. Used for cleanup purposes by requester.
 func (c *Client) deleteResponse(id string) {
 	c.results.Delete(id)
-	gutil.WarnLev(1, "%s %s results DELETED", time.Now(), id[:3])
+	// gutil.WarnLev(1, "%s %s results DELETED", time.Now(), id[:3])
 	return
 }
 

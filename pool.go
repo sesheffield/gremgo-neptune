@@ -408,7 +408,9 @@ func (p *Pool) GetCursorCtx(ctx context.Context, query string, ptr interface{}) 
 	return pc.Client.GetCursorCtx(ctx, query, ptr)
 }
 
-// NextCtx returns the next set of results for the cursor
+// NextCursorCtx returns the next set of results for the cursor
+// - `res` may be empty when results were read by a previous call
+// - `eof` will be true when no more results are available
 func (p *Pool) NextCursorCtx(ctx context.Context, cursor string) (res []graphson.Vertex, eof bool, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {

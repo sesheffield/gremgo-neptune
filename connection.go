@@ -240,8 +240,33 @@ type message struct {
 	err   error
 }
 
+func (c *Client) xreadWorkerCtx(ctx context.Context, msgs chan []byte, errs chan error) {
+	for {
+		select {
+		case <-ctx.Done():
+		default:
+			msgType, msg, err := c.conn.(*Ws).conn.ReadMessage()
+
+			if msgType == -1 { // msgType == -1 is noFrame (close connection)
+				return
+			}
+			if err != nil {
+				errs <- errors.Wrapf(err, "Receive message type: %d", msgType)
+				c.Errored = true
+				return
+			}
+			if msg != nil {
+				// gutil.WarnLev(1, "got msg %d len %d", i, len(msg.msg))
+				// continue
+
+				msgs <- msg // XXX
+			}
+		}
+	}
+}
+
 // readWorkerCtx works on a loop and sorts read messages as soon as it receives them
-func (c *Client) readWorkerCtx(ctx context.Context, errs chan error) {
+func (c *Client) readWorkerCtx(ctx context.Context, msgs chan []byte, errs chan error) {
 	receivedMsgChan := make(chan message, 100)
 	go c.conn.readCtx(ctx, receivedMsgChan)
 
@@ -260,12 +285,13 @@ func (c *Client) readWorkerCtx(ctx context.Context, errs chan error) {
 			}
 			if msg.msg != nil {
 				// gutil.WarnLev(1, "got msg %d len %d", i, len(msg.msg))
-				// continue
-				if err := c.handleResponse(msg.msg); err != nil {
-					// XXX this makes the err fatal
-					errs <- errors.Wrapf(err, "handleResponse fail: %q", msg.msg)
-					c.Errored = true
-				}
+
+				msgs <- msg.msg // XXX
+				// if err := c.handleResponse(msg.msg); err != nil {
+				// 	// XXX this makes the err fatal
+				// 	errs <- errors.Wrapf(err, "handleResponse fail: %q", msg.msg)
+				// 	c.Errored = true
+				// }
 			}
 		}
 	}
