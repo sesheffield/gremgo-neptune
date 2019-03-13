@@ -22,7 +22,8 @@ type Client struct {
 	requests         chan []byte
 	responses        chan []byte
 	results          *sync.Map
-	responseNotifier *sync.Map // responseNotifier notifies the requester that a response has arrived for the request
+	responseNotifier *sync.Map // responseNotifier notifies the requester that a response has been completed for the request
+	chunkNotifier    *sync.Map // chunkNotifier notifies (if using a cursor) the requester that a partial response has arrived for the request
 	mu               sync.RWMutex
 	Errored          bool
 }
@@ -30,7 +31,7 @@ type Client struct {
 // NewDialer returns a WebSocket dialer to use when connecting to Gremlin Server
 func NewDialer(host string, configs ...DialerConfig) (dialer *Ws) {
 	dialer = &Ws{
-		timeout:      5 * time.Second,
+		timeout:      15 * time.Second,
 		pingInterval: 60 * time.Second,
 		writingWait:  15 * time.Second,
 		readingWait:  15 * time.Second,
@@ -51,6 +52,7 @@ func newClient() (c Client) {
 	c.responses = make(chan []byte, 3) // c.responses takes raw responses from ReadWorker and delivers it for sorting to handleResponse
 	c.results = &sync.Map{}
 	c.responseNotifier = &sync.Map{}
+	c.chunkNotifier = &sync.Map{}
 	return
 }
 
@@ -74,6 +76,7 @@ func DialCtx(ctx context.Context, conn dialer, errs chan error) (c Client, err e
 
 	go c.writeWorkerCtx(ctx, errs)
 	go c.readWorkerCtx(ctx, errs)
+	// go c.readWorker(errs, quit)
 	go conn.pingCtx(ctx, errs)
 
 	return
@@ -102,6 +105,22 @@ func (c *Client) executeRequestCtx(ctx context.Context, query string, bindings, 
 		err = errors.Wrapf(err, "query: %s", query)
 	}
 	return
+}
+func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (id string, err error) {
+	var req request
+	if req, id, err = prepareRequest(query, bindings, rebindings); err != nil {
+		return
+	}
+
+	var msg []byte
+	if msg, err = packageRequest(req); err != nil {
+		log.Println(err)
+		return
+	}
+	c.responseNotifier.Store(id, make(chan error, 1))
+	c.chunkNotifier.Store(id, make(chan bool, 10))
+	c.dispatchRequestCtx(ctx, msg)
+	return id, nil
 }
 
 func (c *Client) authenticate(requestID string) (err error) {
@@ -155,15 +174,19 @@ func (c *Client) GetCtx(ctx context.Context, query string, ptr interface{}) (res
 		return
 	}
 
-	gutil.Dump("GetQ ", query)
+	gutil.Dump("Get Q ", query)
 	var resp []Response
-	resp, err = c.executeRequest(query, nil, nil)
+	resp, err = c.executeRequestCtx(ctx, query, nil, nil)
 	if err != nil {
 		return
 	}
 	gutil.Dump("GetRes ", resp)
+	return c.deserializeResponseToVertices(resp)
+}
+
+func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.Vertex, err error) {
 	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
-		gutil.Warn("no results")
+		// gutil.Warn("deserializeR2V: no results - status: %s", resp[0].Status.Code)
 		return
 	}
 
@@ -177,6 +200,34 @@ func (c *Client) GetCtx(ctx context.Context, query string, ptr interface{}) (res
 		res = append(res, resN...)
 	}
 	// 	gutil.Dump("GetZ ", strct)
+	return
+}
+
+// GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
+func (c *Client) GetCursorCtx(ctx context.Context, query string, ptr interface{}) (respID string, err error) {
+	if c.conn.isDisposed() {
+		err = ErrorConnectionDisposed
+		return
+	}
+
+	gutil.Dump("GetCurs Q ", query)
+	respID, err = c.executeRequestCursorCtx(ctx, query, nil, nil)
+	if err != nil {
+		return
+	}
+	gutil.Dump("GetCurs Res ", respID)
+	return
+}
+
+// NextCursorCtx returns the next set of results for the cursor (eof will be true when no more results are available)
+func (c *Client) NextCursorCtx(ctx context.Context, cursor string) (res []graphson.Vertex, eof bool, err error) {
+	var resp []Response
+	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
+		err = errors.Wrapf(err, "cursor: %s", cursor)
+		return
+	}
+
+	res, err = c.deserializeResponseToVertices(resp)
 	return
 }
 
@@ -194,7 +245,7 @@ func (c *Client) GetE(query string) (res graphson.Edges, err error) {
 	}
 	gutil.Dump("GetERes ", resp)
 	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
-		gutil.Warn("no results")
+		gutil.Warn("GetE: no results")
 		return
 	}
 

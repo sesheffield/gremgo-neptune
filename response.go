@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	gutil "github.com/gedge/gremgo-neptune/utils"
 )
@@ -79,13 +80,27 @@ func (c *Client) saveResponse(resp Response, err error) {
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
 		container = existingData.([]interface{})
+		existingData = nil
 		gutil.Dump("more for requestID: %s len: %d data: %v", resp.RequestID, len(resp.Result.Data), resp.Result.Data)
 	}
 	newdata := append(container, resp)       // Create new data container with new data
 	c.results.Store(resp.RequestID, newdata) // Add new data to buffer for future retrieval
-	respNotifier, _ := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
+	respNotifier, loaded := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
+	if !loaded {
+		gutil.WarnLev(1, "respNotifier NOT LOADED %s", resp.RequestID)
+	}
 	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
-	if resp.Status.Code != statusPartialContent {
+	if resp.Status.Code == statusPartialContent {
+		if chunkNotifier, ok := c.chunkNotifier.Load(resp.RequestID); ok {
+			gutil.Warn("%s chunk %s", time.Now(), resp.RequestID[:3])
+			chunkNotifier.(chan bool) <- true
+		}
+	} else {
+		if err != nil {
+			gutil.Warn("%s response DONE: %s", time.Now(), err.Error())
+		} else {
+			gutil.Warn("%s response DONE", time.Now())
+		}
 		respNotifier.(chan error) <- err
 	}
 }
@@ -93,20 +108,42 @@ func (c *Client) saveResponse(resp Response, err error) {
 // retrieveResponse retrieves the response saved by saveResponse.
 func (c *Client) retrieveResponse(id string) (data []Response, err error) {
 	resp, _ := c.responseNotifier.Load(id)
-	err = <-resp.(chan error)
-	if err == nil {
-		if dataI, ok := c.results.Load(id); ok {
-			d := dataI.([]interface{})
-			data = make([]Response, len(d))
-			for i := range d {
-				data[i] = d[i].(Response)
-			}
-			close(resp.(chan error))
-			c.responseNotifier.Delete(id)
-			c.deleteResponse(id)
-		}
+	if err = <-resp.(chan error); err == nil {
+		data = c.getCurrentResults(id)
+		c.cleanResults(id, resp.(chan error), nil)
 	}
 	return
+}
+
+func (c *Client) getCurrentResults(id string) (data []Response) {
+	dataI, ok := c.results.Load(id)
+	if !ok {
+		return
+	}
+	d := dataI.([]interface{})
+	dataI = nil
+	data = make([]Response, len(d))
+	if len(d) == 0 {
+		return
+	}
+	for i := range d {
+		data[i] = d[i].(Response)
+	}
+	return
+}
+
+func (c *Client) cleanResults(id string, respNotifier chan error, chunkNotifier chan bool) {
+	if respNotifier == nil {
+		return
+	}
+	c.responseNotifier.Delete(id)
+	gutil.WarnLev(1, "responseNotifier DELETED %s", id)
+	close(respNotifier)
+	if chunkNotifier != nil {
+		close(chunkNotifier)
+		c.chunkNotifier.Delete(id)
+	}
+	c.deleteResponse(id)
 }
 
 // retrieveResponseCtx retrieves the response saved by saveResponse.
@@ -117,18 +154,43 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 		if err != nil {
 			return
 		}
-		if dataI, ok := c.results.Load(id); ok {
-			d := dataI.([]interface{})
-			data = make([]Response, len(d))
-			for i := range d {
-				data[i] = d[i].(Response)
-			}
-			close(respNotifier.(chan error))
-			c.responseNotifier.Delete(id)
-			c.deleteResponse(id)
-		} else {
-			err = fmt.Errorf("no results loaded for id: %s", id)
+		data = c.getCurrentResults(id)
+		c.cleanResults(id, respNotifier.(chan error), nil)
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	return
+}
+
+// retrieveNextResponseCtx retrieves the current response saved by saveResponse, `done` is true when the results are complete (eof)
+func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data []Response, done bool, err error) {
+	respNotifier, _ := c.responseNotifier.Load(id)
+	if respNotifier == nil {
+		gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", id)
+		data = c.getCurrentResults(id)
+		c.deleteResponse(id)
+		//done = true // XXX check this
+		return
+	}
+
+	var chunkNotifier chan bool
+	if chunkNotifierInterface, ok := c.chunkNotifier.Load(id); ok {
+		chunkNotifier = chunkNotifierInterface.(chan bool)
+	}
+
+	select {
+	case err = <-respNotifier.(chan error):
+		if err != nil {
+			return
 		}
+		data = c.getCurrentResults(id)
+		c.cleanResults(id, respNotifier.(chan error), chunkNotifier)
+		done = true
+	case <-chunkNotifier:
+		c.mu.Lock()
+		data = c.getCurrentResults(id)
+		c.deleteResponse(id)
+		c.mu.Unlock()
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
@@ -138,6 +200,7 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 // deleteResponse deletes the response from the container. Used for cleanup purposes by requester.
 func (c *Client) deleteResponse(id string) {
 	c.results.Delete(id)
+	gutil.WarnLev(1, "results DELETED %s", id[:3])
 	return
 }
 

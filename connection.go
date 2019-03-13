@@ -133,7 +133,7 @@ func (ws *Ws) close() (err error) {
 
 func (ws *Ws) getAuth() *auth {
 	if ws.auth == nil {
-		panic("You must create a Secure Dialer for authenticate with the server")
+		panic("You must create a Secure Dialer for authenticating with the server")
 	}
 	return ws.auth
 }
@@ -242,10 +242,10 @@ type message struct {
 
 // readWorkerCtx works on a loop and sorts read messages as soon as it receives them
 func (c *Client) readWorkerCtx(ctx context.Context, errs chan error) {
-	receivedMsgChan := make(chan message, 1)
+	receivedMsgChan := make(chan message, 100)
 	go c.conn.readCtx(ctx, receivedMsgChan)
 
-	for {
+	for i := 0; ; i++ {
 		select {
 		case <-ctx.Done():
 			return
@@ -259,6 +259,8 @@ func (c *Client) readWorkerCtx(ctx context.Context, errs chan error) {
 				return
 			}
 			if msg.msg != nil {
+				// gutil.WarnLev(1, "got msg %d len %d", i, len(msg.msg))
+				// continue
 				if err := c.handleResponse(msg.msg); err != nil {
 					// XXX this makes the err fatal
 					errs <- errors.Wrapf(err, "handleResponse fail: %q", msg.msg)
