@@ -76,14 +76,16 @@ func marshalResponse(msg []byte) (resp Response, err error) {
 func (c *Client) saveResponse(resp Response, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var container []interface{}
+	var newdata []interface{}
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
-		container = existingData.([]interface{})
+		// container := existingData.([]interface{})
+		// gutil.DumpLev(1, "more for requestID: %s len: %d data", resp.RequestID[:3], len(resp.Result.Data)) //, resp.Result.Data)
+		newdata = append(existingData.([]interface{}), resp) // Create new data container with new data
 		existingData = nil
-		gutil.Dump("more for requestID: %s len: %d data: %v", resp.RequestID, len(resp.Result.Data), resp.Result.Data)
+	} else {
+		newdata = append(newdata, resp)
 	}
-	newdata := append(container, resp)       // Create new data container with new data
 	c.results.Store(resp.RequestID, newdata) // Add new data to buffer for future retrieval
 	respNotifier, loaded := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
 	if !loaded {
@@ -92,7 +94,7 @@ func (c *Client) saveResponse(resp Response, err error) {
 	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
 	if resp.Status.Code == statusPartialContent {
 		if chunkNotifier, ok := c.chunkNotifier.Load(resp.RequestID); ok {
-			gutil.Warn("%s chunk %s", time.Now(), resp.RequestID[:3])
+			gutil.Warn("%s %s chunk", time.Now(), resp.RequestID[:3])
 			chunkNotifier.(chan bool) <- true
 		}
 	} else {
@@ -137,7 +139,7 @@ func (c *Client) cleanResults(id string, respNotifier chan error, chunkNotifier 
 		return
 	}
 	c.responseNotifier.Delete(id)
-	gutil.WarnLev(1, "responseNotifier DELETED %s", id)
+	gutil.WarnLev(1, "%s %s responseNotifier DELETED", time.Now(), id[:3])
 	close(respNotifier)
 	if chunkNotifier != nil {
 		close(chunkNotifier)
@@ -200,7 +202,7 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data [
 // deleteResponse deletes the response from the container. Used for cleanup purposes by requester.
 func (c *Client) deleteResponse(id string) {
 	c.results.Delete(id)
-	gutil.WarnLev(1, "results DELETED %s", id[:3])
+	gutil.WarnLev(1, "%s %s results DELETED", time.Now(), id[:3])
 	return
 }
 

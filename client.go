@@ -23,7 +23,7 @@ type Client struct {
 	responses        chan []byte
 	results          *sync.Map
 	responseNotifier *sync.Map // responseNotifier notifies the requester that a response has been completed for the request
-	chunkNotifier    *sync.Map // chunkNotifier notifies (if using a cursor) the requester that a partial response has arrived for the request
+	chunkNotifier    *sync.Map // chunkNotifier contains channels per requestID (if using cursors) which notifies the requester that a partial response has arrived
 	mu               sync.RWMutex
 	Errored          bool
 }
