@@ -378,34 +378,34 @@ func (p *Pool) AddV(query string, i interface{}) (resp graphson.Vertex, err erro
 }
 
 // Get
-func (p *Pool) Get(query string, i interface{}) (resp interface{}, err error) {
+func (p *Pool) Get(query string) (resp interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.Get(query, i)
+	return pc.Client.Get(query)
 }
 
 // GetCtx
-func (p *Pool) GetCtx(ctx context.Context, query string, i interface{}) (resp interface{}, err error) {
+func (p *Pool) GetCtx(ctx context.Context, query string) (resp interface{}, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		return resp, errors.Wrap(err, "GetCtx: Failed p.connCtx")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetCtx(ctx, query, i)
+	return pc.Client.GetCtx(ctx, query)
 }
 
 // GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
-func (p *Pool) GetCursorCtx(ctx context.Context, query string, ptr interface{}) (respID string, err error) {
+func (p *Pool) GetCursorCtx(ctx context.Context, query string) (respID string, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		err = errors.Wrap(err, "GetCursorCtx: Failed p.connCtx")
 		return
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetCursorCtx(ctx, query, ptr)
+	return pc.Client.GetCursorCtx(ctx, query)
 }
 
 // NextCursorCtx returns the next set of results for the cursor

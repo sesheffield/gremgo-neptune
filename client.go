@@ -167,10 +167,12 @@ func (c *Client) ExecuteFile(path string, bindings, rebindings map[string]string
 }
 
 // Get formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
-func (c *Client) Get(query string, ptr interface{}) (res []graphson.Vertex, err error) {
-	return c.GetCtx(context.Background(), query, ptr)
+func (c *Client) Get(query string) (res []graphson.Vertex, err error) {
+	return c.GetCtx(context.Background(), query)
 }
-func (c *Client) GetCtx(ctx context.Context, query string, ptr interface{}) (res []graphson.Vertex, err error) {
+
+// GetCtx as Get with context
+func (c *Client) GetCtx(ctx context.Context, query string) (res []graphson.Vertex, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
@@ -206,7 +208,7 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 }
 
 // GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
-func (c *Client) GetCursorCtx(ctx context.Context, query string, ptr interface{}) (respID string, err error) {
+func (c *Client) GetCursorCtx(ctx context.Context, query string) (respID string, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
