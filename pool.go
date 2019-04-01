@@ -441,6 +441,15 @@ func (p *Pool) GetE(q string) (resp interface{}, err error) {
 	return pc.Client.GetE(q)
 }
 
+func (p *Pool) GetCount(q string) (i int64, err error) {
+	var pc *conn
+	if pc, err = p.conn(); err != nil {
+		return 0, errors.Wrap(err, "Failed p.conn")
+	}
+	defer p.putConn(pc, err)
+	return pc.Client.GetCount(q, nil, nil)
+}
+
 // Close closes the pool.
 func (p *Pool) Close() {
 	p.mu.Lock()

@@ -267,6 +267,25 @@ func (c *Client) GetE(query string) (res graphson.Edges, err error) {
 	return
 }
 
+// GetCount returns the count element returned by an Execute()
+func (c *Client) GetCount(query string, bindings, rebindings map[string]string) (i int64, err error) {
+	var res []Response
+	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+		return
+	}
+	if len(res) > 1 {
+		err = errors.New("GetCount: expected one result, got more than one")
+		return
+	} else if len(res) == 0 {
+		err = errors.New("GetCount: expected one result, got zero")
+		return
+	}
+	if i, err = graphson.DeserializeCountFromBytes(res[0].Result.Data); err != nil {
+		return
+	}
+	return
+}
+
 // GremlinForVertex returns the addV()... and V()... gremlin commands for `data`
 // Because of possible multiples, it does not start with `g.` (it probably should XXX )
 func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, err error) {

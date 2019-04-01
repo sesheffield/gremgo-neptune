@@ -66,7 +66,6 @@ func (c *Client) saveWorkerCtx(ctx context.Context, msgChan chan []byte, errs ch
 func (c *Client) handleResponse(msg []byte) (err error) {
 	var resp Response
 	resp, err = marshalResponse(msg)
-	// err = errors.New("ook")
 	if resp.Status.Code == statusAuthenticate { //Server request authentication
 		return c.authenticate(resp.RequestID)
 	}
@@ -113,9 +112,9 @@ func (c *Client) saveResponse(resp Response, err error) {
 		}
 	} else {
 		if err != nil {
-			gutil.Warn("%s response DONE: %s", time.Now(), err.Error())
+			gutil.Warn("%s response DONE %q: %s", time.Now(), resp.RequestID, err.Error())
 		} else {
-			gutil.Warn("%s response DONE", time.Now())
+			gutil.Warn("%s response DONE %q", time.Now(), resp.RequestID)
 		}
 		respNotifier.(chan error) <- err
 	}
@@ -179,10 +178,13 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 	return
 }
 
-// retrieveNextResponseCtx retrieves the current response saved by saveResponse, `done` is true when the results are complete (eof)
+// retrieveNextResponseCtx retrieves the current response (may be empty!) saved by saveResponse,
+//  `done` is true when the results are complete (eof)
 func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data []Response, done bool, err error) {
-	respNotifier, _ := c.responseNotifier.Load(id)
-	if respNotifier == nil {
+	c.mu.Lock()
+	respNotifier, ok := c.responseNotifier.Load(id)
+	c.mu.Unlock()
+	if respNotifier == nil || !ok {
 		gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", id)
 		data = c.getCurrentResults(id)
 		c.deleteResponse(id)

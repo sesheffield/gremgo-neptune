@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	gutil "github.com/gedge/gremgo-neptune/utils"
 )
@@ -26,9 +27,7 @@ func DeserializeVerticesFromBytes(rawResponse []byte) ([]Vertex, error) {
 	}
 	dec := json.NewDecoder(bytes.NewReader(rawResponse))
 	dec.DisallowUnknownFields()
-	err := dec.Decode(&response)
-	// panic("urror")
-	if err != nil {
+	if err := dec.Decode(&response); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -42,8 +41,7 @@ func DeserializeListOfVerticesFromBytes(rawResponse []byte) ([]Vertex, error) {
 	}
 	dec := json.NewDecoder(bytes.NewReader(rawResponse))
 	dec.DisallowUnknownFields()
-	err := dec.Decode(&metaResponse)
-	if err != nil {
+	if err := dec.Decode(&metaResponse); err != nil {
 		return nil, err
 	}
 
@@ -95,6 +93,53 @@ func DeserializeMapFromBytes(rawResponse []byte) (resMap map[string]interface{},
 	return resMap, nil
 }
 
+// DeserializeSingleFromBytes get a g:List value which should be a singular item, returns that item
+func DeserializeSingleFromBytes(rawResponse []byte) (gV GenericValue, err error) {
+	var metaResponse GList
+	if len(rawResponse) == 0 {
+		err = errors.New("DeserializeSingleFromBytes: nothing to decode")
+		return
+	}
+	dec := json.NewDecoder(bytes.NewReader(rawResponse))
+	dec.DisallowUnknownFields()
+	if err = dec.Decode(&metaResponse); err != nil {
+		return
+	}
+
+	if metaResponse.Type != "g:List" {
+		gutil.Dump("unmap ", metaResponse)
+		err = errors.New("DeserializeSingleFromBytes: Expected `g:List` type")
+		return
+	}
+
+	var genVals GenericValues
+	if genVals, err = DeserializeGenericValues(string(metaResponse.Value)); err != nil {
+		return
+	}
+
+	if len(genVals) != 1 {
+		err = fmt.Errorf("DeserializeSingleFromBytes: Expected single value, got %d", len(genVals))
+		return
+	}
+
+	return genVals[0], nil
+}
+
+func DeserializeCountFromBytes(rawResponse []byte) (count int64, err error) {
+	var genVal GenericValue
+	if genVal, err = DeserializeSingleFromBytes(rawResponse); err != nil {
+		return
+	}
+
+	if genVal.Type != "g:Int64" {
+		err = errors.New("DeserializeCountFromBytes: Expected `g:Int64` type")
+		return
+	}
+	// count = int64(math.Trunc(genVal.Value.(float64)))
+	count = int64(genVal.Value.(float64))
+	return
+}
+
 func DeserializeEdges(rawResponse string) (Edges, error) {
 	var response Edges
 	if rawResponse == "" {
@@ -107,16 +152,14 @@ func DeserializeEdges(rawResponse string) (Edges, error) {
 	return response, nil
 }
 
-func DeserializeGenericValue(rawResponse string) (GenericValue, error) {
-	var response GenericValue
-	if rawResponse == "" {
-		return response, nil
+func DeserializeGenericValue(rawResponse string) (response GenericValue, err error) {
+	if len(rawResponse) == 0 {
+		return
 	}
-	err := json.Unmarshal([]byte(rawResponse), &response)
-	if err != nil {
-		return response, err
+	if err = json.Unmarshal([]byte(rawResponse), &response); err != nil {
+		return
 	}
-	return response, nil
+	return
 }
 
 func DeserializeGenericValues(rawResponse string) (GenericValues, error) {
