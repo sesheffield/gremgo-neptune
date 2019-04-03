@@ -14,7 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrorConnectionDisposed = errors.New("you cannot write on a disposed connection")
+var (
+	ErrorConnectionDisposed = errors.New("you cannot write on a disposed connection")
+	ErrorNoGraphTags        = errors.New("does not contain any graph tags")
+)
 
 // Client is a container for the gremgo client.
 type Client struct {
@@ -26,6 +29,10 @@ type Client struct {
 	chunkNotifier    *sync.Map // chunkNotifier contains channels per requestID (if using cursors) which notifies the requester that a partial response has arrived
 	mu               sync.RWMutex
 	Errored          bool
+}
+
+type Cursor struct {
+	ID string
 }
 
 // NewDialer returns a WebSocket dialer to use when connecting to Gremlin Server
@@ -108,8 +115,9 @@ func (c *Client) executeRequestCtx(ctx context.Context, query string, bindings, 
 	}
 	return
 }
-func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (id string, err error) {
+func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor Cursor, err error) {
 	var req request
+	var id string
 	if req, id, err = prepareRequest(query, bindings, rebindings); err != nil {
 		return
 	}
@@ -122,7 +130,8 @@ func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bind
 	c.responseNotifier.Store(id, make(chan error, 1))
 	c.chunkNotifier.Store(id, make(chan bool, 10))
 	c.dispatchRequestCtx(ctx, msg)
-	return id, nil
+	cursor.ID = id
+	return
 }
 
 func (c *Client) authenticate(requestID string) (err error) {
@@ -208,32 +217,34 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 }
 
 // GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
-func (c *Client) GetCursorCtx(ctx context.Context, query string) (respID string, err error) {
+func (c *Client) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
 	}
 
 	gutil.Dump("GetCurs Q ", query)
-	respID, err = c.executeRequestCursorCtx(ctx, query, nil, nil)
-	if err != nil {
+	if cursor, err = c.executeRequestCursorCtx(ctx, query, nil, nil); err != nil {
 		return
 	}
-	gutil.Dump("GetCurs Res ", respID)
+	gutil.Dump("GetCurs Res ", cursor.ID)
 	return
 }
 
-// NextCursorCtx returns the next set of results for the cursor
+// NextCursorCtx returns the next set of results, deserialized as []Vertex, for the cursor
 // - `res` may be empty when results were read by a previous call
 // - `eof` will be true when no more results are available
-func (c *Client) NextCursorCtx(ctx context.Context, cursor string) (res []graphson.Vertex, eof bool, err error) {
+func (c *Client) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
-		err = errors.Wrapf(err, "cursor: %s", cursor)
+		err = errors.Wrapf(err, "NextCursorCtx: %s", cursor.ID)
 		return
 	}
 
-	res, err = c.deserializeResponseToVertices(resp)
+	if res, err = c.deserializeResponseToVertices(resp); err != nil {
+		err = errors.Wrapf(err, "NextCursorCtx: %s", cursor.ID)
+		return
+	}
 	return
 }
 
@@ -307,7 +318,7 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 		gremGet = fmt.Sprintf("%s.hasId('%s')", gremGet, id)
 	}
 
-	// missingTag := true
+	missingTag := true
 
 	for i := 0; i < d.NumField(); i++ {
 		tag := d.Type().Field(i).Tag.Get("graph")
@@ -316,7 +327,7 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 			// gutil.Warn("no opts for field %q with label %q data %+v", d.Type().Field(i).Name, label, data)
 			continue
 		}
-		// missingTag = false
+		missingTag = false
 		val := d.Field(i).Interface()
 		if len(opts) == 0 {
 			err = fmt.Errorf("interface field tag does not contain a tag option type, field type: %T", val)
@@ -357,10 +368,10 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 		}
 	}
 
-	// if missingTag {
-	// 	err = fmt.Errorf("interface of type: %T, does not contain any graph tags", data)
-	// 	return
-	// }
+	if missingTag {
+		err = ErrorNoGraphTags
+		return
+	}
 	return
 }
 
@@ -371,7 +382,7 @@ func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err
 	}
 
 	q, _, err := GremlinForVertex(label, data)
-	if err != nil {
+	if err != nil && err != ErrorNoGraphTags {
 		panic(err) // XXX
 	}
 	q = "g." + q

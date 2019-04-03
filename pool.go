@@ -398,7 +398,7 @@ func (p *Pool) GetCtx(ctx context.Context, query string) (resp interface{}, err 
 }
 
 // GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
-func (p *Pool) GetCursorCtx(ctx context.Context, query string) (respID string, err error) {
+func (p *Pool) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		err = errors.Wrap(err, "GetCursorCtx: Failed p.connCtx")
@@ -411,7 +411,7 @@ func (p *Pool) GetCursorCtx(ctx context.Context, query string) (respID string, e
 // NextCursorCtx returns the next set of results for the cursor
 // - `res` may be empty when results were read by a previous call
 // - `eof` will be true when no more results are available
-func (p *Pool) NextCursorCtx(ctx context.Context, cursor string) (res []graphson.Vertex, eof bool, err error) {
+func (p *Pool) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		err = errors.Wrap(err, "NextCtx: Failed p.connCtx")

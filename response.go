@@ -180,20 +180,20 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 
 // retrieveNextResponseCtx retrieves the current response (may be empty!) saved by saveResponse,
 //  `done` is true when the results are complete (eof)
-func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data []Response, done bool, err error) {
+func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (data []Response, done bool, err error) {
 	c.mu.Lock()
-	respNotifier, ok := c.responseNotifier.Load(id)
+	respNotifier, ok := c.responseNotifier.Load(cursor.ID)
 	c.mu.Unlock()
 	if respNotifier == nil || !ok {
-		gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", id)
-		data = c.getCurrentResults(id)
-		c.deleteResponse(id)
+		gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", cursor.ID)
+		data = c.getCurrentResults(cursor.ID)
+		c.deleteResponse(cursor.ID)
 		//done = true // XXX check this
 		return
 	}
 
 	var chunkNotifier chan bool
-	if chunkNotifierInterface, ok := c.chunkNotifier.Load(id); ok {
+	if chunkNotifierInterface, ok := c.chunkNotifier.Load(cursor.ID); ok {
 		chunkNotifier = chunkNotifierInterface.(chan bool)
 	}
 
@@ -202,13 +202,13 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, id string) (data [
 		if err != nil {
 			return
 		}
-		data = c.getCurrentResults(id)
-		c.cleanResults(id, respNotifier.(chan error), chunkNotifier)
+		data = c.getCurrentResults(cursor.ID)
+		c.cleanResults(cursor.ID, respNotifier.(chan error), chunkNotifier)
 		done = true
 	case <-chunkNotifier:
 		c.mu.Lock()
-		data = c.getCurrentResults(id)
-		c.deleteResponse(id)
+		data = c.getCurrentResults(cursor.ID)
+		c.deleteResponse(cursor.ID)
 		c.mu.Unlock()
 	case <-ctx.Done():
 		err = ctx.Err()
