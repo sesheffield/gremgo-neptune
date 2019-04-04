@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	gutil "github.com/gedge/gremgo-neptune/utils"
 )
 
 func DeserializeVertices(rawResponse string) ([]Vertex, error) {
@@ -46,7 +44,6 @@ func DeserializeListOfVerticesFromBytes(rawResponse []byte) ([]Vertex, error) {
 	}
 
 	if metaResponse.Type != "g:List" {
-		gutil.Dump("unlist ", metaResponse)
 		return response, errors.New("Expected `g:List` type")
 	}
 
@@ -67,7 +64,6 @@ func DeserializeListOfEdgesFromBytes(rawResponse []byte) (Edges, error) {
 	}
 
 	if metaResponse.Type != "g:List" {
-		gutil.Dump("unlist ", metaResponse)
 		return response, errors.New("Expected `g:List` type")
 	}
 
@@ -86,7 +82,6 @@ func DeserializeMapFromBytes(rawResponse []byte) (resMap map[string]interface{},
 	}
 
 	if metaResponse.Type != "g:Map" {
-		gutil.Dump("unmap ", metaResponse)
 		return resMap, errors.New("Expected `g:Map` type")
 	}
 
@@ -107,7 +102,6 @@ func DeserializeSingleFromBytes(rawResponse []byte) (gV GenericValue, err error)
 	}
 
 	if metaResponse.Type != "g:List" {
-		gutil.Dump("unmap ", metaResponse)
 		err = errors.New("DeserializeSingleFromBytes: Expected `g:List` type")
 		return
 	}

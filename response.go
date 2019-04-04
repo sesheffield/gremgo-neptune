@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
-	gutil "github.com/gedge/gremgo-neptune/utils"
 	"github.com/pkg/errors"
 )
 
@@ -92,30 +90,19 @@ func (c *Client) saveResponse(resp Response, err error) {
 	var newdata []interface{}
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
-		// container := existingData.([]interface{})
-		// gutil.DumpLev(1, "more for requestID: %s len: %d data", resp.RequestID[:3], len(resp.Result.Data)) //, resp.Result.Data)
 		newdata = append(existingData.([]interface{}), resp) // Create new data container with new data
 		existingData = nil
 	} else {
 		newdata = append(newdata, resp)
 	}
 	c.results.Store(resp.RequestID, newdata) // Add new data to buffer for future retrieval
-	respNotifier, loaded := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
-	if !loaded {
-		gutil.WarnLev(1, "respNotifier NOT LOADED %s", resp.RequestID)
-	}
+	respNotifier, _ := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
 	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
 	if resp.Status.Code == statusPartialContent {
 		if chunkNotifier, ok := c.chunkNotifier.Load(resp.RequestID); ok {
-			// gutil.Warn("%s %s chunk", time.Now(), resp.RequestID[:3])
 			chunkNotifier.(chan bool) <- true
 		}
 	} else {
-		if err != nil {
-			gutil.Warn("%s response DONE %q: %s", time.Now(), resp.RequestID, err.Error())
-		} else {
-			gutil.Warn("%s response DONE %q", time.Now(), resp.RequestID)
-		}
 		respNotifier.(chan error) <- err
 	}
 }
@@ -152,11 +139,9 @@ func (c *Client) cleanResults(id string, respNotifier chan error, chunkNotifier 
 		return
 	}
 	c.responseNotifier.Delete(id)
-	gutil.WarnLev(1, "%s %s responseNotifier DELETED", time.Now(), id[:3])
 	close(respNotifier)
 	if chunkNotifier != nil {
 		close(chunkNotifier)
-		gutil.WarnLev(1, "%s %s chunkNotifier DELETED", time.Now(), id[:3])
 		c.chunkNotifier.Delete(id)
 	}
 	c.deleteResponse(id)
@@ -185,7 +170,7 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 	respNotifier, ok := c.responseNotifier.Load(cursor.ID)
 	c.mu.Unlock()
 	if respNotifier == nil || !ok {
-		gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", cursor.ID)
+		// gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", cursor.ID)
 		data = c.getCurrentResults(cursor.ID)
 		c.deleteResponse(cursor.ID)
 		//done = true // XXX check this
@@ -219,7 +204,6 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 // deleteResponse deletes the response from the container. Used for cleanup purposes by requester.
 func (c *Client) deleteResponse(id string) {
 	c.results.Delete(id)
-	// gutil.WarnLev(1, "%s %s results DELETED", time.Now(), id[:3])
 	return
 }
 

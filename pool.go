@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gedge/gremgo-neptune/graphson"
-	gutil "github.com/gedge/gremgo-neptune/utils"
 	"github.com/pkg/errors"
 )
 
@@ -92,7 +91,7 @@ func (p *Pool) maybeOpenNewConnections() {
 func (p *Pool) opener() {
 	for range p.openerCh {
 		if err := p.openNewConnection(); err != nil {
-			gutil.WarnLev(1, "failed opener "+err.Error())
+			// gutil.WarnLev(1, "failed opener "+err.Error()) XXX
 		}
 	}
 }
@@ -326,7 +325,6 @@ func (p *Pool) connectionCleaner() {
 
 		for _, pc := range closing {
 			if pc.Client != nil {
-				gutil.Warn("pool conn closing")
 				pc.Client.Close()
 			}
 		}
@@ -409,8 +407,8 @@ func (p *Pool) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, e
 }
 
 // NextCursorCtx returns the next set of results for the cursor
-// - `res` may be empty when results were read by a previous call
-// - `eof` will be true when no more results are available
+// - `res` returns vertices (and may be empty when results were read by a previous call - this is normal)
+// - `eof` will be true when no more results are available (`res` may still have results)
 func (p *Pool) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
@@ -422,13 +420,13 @@ func (p *Pool) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson
 }
 
 // AddE
-func (p *Pool) AddE(label, fromId, toId string) (resp interface{}, err error) {
+func (p *Pool) AddE(label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.AddE(label, fromId, toId)
+	return pc.Client.AddE(label, fromId, toId, props)
 }
 
 // GetE

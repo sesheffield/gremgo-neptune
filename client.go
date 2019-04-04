@@ -1,6 +1,7 @@
 package gremgo
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -10,13 +11,13 @@ import (
 	"time"
 
 	"github.com/gedge/gremgo-neptune/graphson"
-	gutil "github.com/gedge/gremgo-neptune/utils"
 	"github.com/pkg/errors"
 )
 
 var (
-	ErrorConnectionDisposed = errors.New("you cannot write on a disposed connection")
-	ErrorNoGraphTags        = errors.New("does not contain any graph tags")
+	ErrorConnectionDisposed      = errors.New("you cannot write on a disposed connection")
+	ErrorNoGraphTags             = errors.New("does not contain any graph tags")
+	ErrorUnsupportedPropertyType = errors.New("unsupported property map value type")
 )
 
 // Client is a container for the gremgo client.
@@ -79,13 +80,11 @@ func DialCtx(ctx context.Context, conn dialer, errs chan error) (c Client, err e
 		return
 	}
 
-	// quit := conn.(*Ws).quit
 	msgChan := make(chan []byte, 200)
 
 	go c.writeWorkerCtx(ctx, errs)
 	go c.readWorkerCtx(ctx, msgChan, errs)
 	go c.saveWorkerCtx(ctx, msgChan, errs)
-	// go c.readWorker(errs, quit)
 	go conn.pingCtx(ctx, errs)
 
 	return
@@ -187,19 +186,16 @@ func (c *Client) GetCtx(ctx context.Context, query string) (res []graphson.Verte
 		return
 	}
 
-	gutil.Dump("Get Q ", query)
 	var resp []Response
 	resp, err = c.executeRequestCtx(ctx, query, nil, nil)
 	if err != nil {
 		return
 	}
-	gutil.Dump("GetRes ", resp)
 	return c.deserializeResponseToVertices(resp)
 }
 
 func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.Vertex, err error) {
 	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
-		// gutil.Warn("deserializeR2V: no results - status: %s", resp[0].Status.Code)
 		return
 	}
 
@@ -208,11 +204,8 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 		if err != nil {
 			panic(err)
 		}
-		// resN := make([]graphson.Vertex, 1)
-		// gutil.Dump(fmt.Sprintf("DLoV%02d ", idx), resN)
 		res = append(res, resN...)
 	}
-	// 	gutil.Dump("GetZ ", strct)
 	return
 }
 
@@ -223,11 +216,9 @@ func (c *Client) GetCursorCtx(ctx context.Context, query string) (cursor Cursor,
 		return
 	}
 
-	gutil.Dump("GetCurs Q ", query)
 	if cursor, err = c.executeRequestCursorCtx(ctx, query, nil, nil); err != nil {
 		return
 	}
-	gutil.Dump("GetCurs Res ", cursor.ID)
 	return
 }
 
@@ -255,23 +246,19 @@ func (c *Client) GetE(query string) (res graphson.Edges, err error) {
 		return
 	}
 
-	gutil.Dump("GetEq ", query)
 	resp, err := c.executeRequest(query, nil, nil)
 	if err != nil {
 		return
 	}
-	gutil.Dump("GetERes ", resp)
 	if len(resp) == 0 || resp[0].Status.Code == statusNoContent {
-		gutil.Warn("GetE: no results")
 		return
 	}
 
-	for idx, item := range resp {
+	for _, item := range resp {
 		var resN graphson.Edges
 		if resN, err = graphson.DeserializeListOfEdgesFromBytes(item.Result.Data); err != nil {
 			return
 		}
-		gutil.Dump(fmt.Sprintf("DLoE%02d ", idx), resN)
 		res = append(res, resN...)
 	}
 
@@ -298,24 +285,23 @@ func (c *Client) GetCount(query string, bindings, rebindings map[string]string) 
 }
 
 // GremlinForVertex returns the addV()... and V()... gremlin commands for `data`
-// Because of possible multiples, it does not start with `g.` (it probably should XXX )
+// Because of possible multiples, it does not start with `g.` (it probably should? XXX )
+// (largely taken from https://github.com/intwinelabs/gremgoser)
 func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, err error) {
-
-	d := reflect.ValueOf(data)
-	var id reflect.Value
-	var missingId bool
-	if id = d.FieldByName("Id"); !id.IsValid() {
-		missingId = true
-		// err = errors.New("the passed interface must have an Id field")
-		// return
-	}
-
 	gremAdd = fmt.Sprintf("addV('%s')", label)
 	gremGet = fmt.Sprintf("V('%s')", label)
 
-	if !missingId {
-		gremAdd = fmt.Sprintf("%s.property(id,'%s')", gremAdd, id)
-		gremGet = fmt.Sprintf("%s.hasId('%s')", gremGet, id)
+	d := reflect.ValueOf(data)
+	id := d.FieldByName("Id")
+	if id.IsValid() {
+		if idField, ok := d.Type().FieldByName("Id"); ok {
+			tag := idField.Tag.Get("graph")
+			name, opts := parseTag(tag)
+			if len(name) == 0 && len(opts) == 0 {
+				gremAdd += fmt.Sprintf(".property(id,'%s')", id)
+				gremGet += fmt.Sprintf(".hasId('%s')", id)
+			}
+		}
 	}
 
 	missingTag := true
@@ -323,44 +309,42 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 	for i := 0; i < d.NumField(); i++ {
 		tag := d.Type().Field(i).Tag.Get("graph")
 		name, opts := parseTag(tag)
-		if len(name) == 0 && len(opts) == 0 {
-			// gutil.Warn("no opts for field %q with label %q data %+v", d.Type().Field(i).Name, label, data)
+		if (len(name) == 0 || name == "-") && len(opts) == 0 {
 			continue
 		}
 		missingTag = false
 		val := d.Field(i).Interface()
 		if len(opts) == 0 {
-			err = fmt.Errorf("interface field tag does not contain a tag option type, field type: %T", val)
+			err = fmt.Errorf("interface field tag %q does not contain a tag option type, field type: %T", name, val)
 			return
 		}
 		if !d.Field(i).IsValid() {
-			gutil.Warn("invalid field for label %q name %q data %+v", label, name, data)
 			continue
 		}
 		if opts.Contains("id") {
 			if val != "" {
-				gremAdd = fmt.Sprintf("%s.property(id,'%s')", gremAdd, val)
-				gremGet = fmt.Sprintf("%s.hasId('%s')", gremGet, val)
+				gremAdd += fmt.Sprintf(".property(id,'%s')", val)
+				gremGet += fmt.Sprintf(".hasId('%s')", val)
 			}
 		} else if opts.Contains("string") {
 			if val != "" {
-				gremAdd = fmt.Sprintf("%s.property('%s','%s')", gremAdd, name, val)
-				gremGet = fmt.Sprintf("%s.has('%s','%s')", gremGet, name, val)
+				gremAdd += fmt.Sprintf(".property('%s','%s')", name, escapeStringy(val.(string)))
+				gremGet += fmt.Sprintf(".has('%s','%s')", name, escapeStringy(val))
 			}
 		} else if opts.Contains("bool") || opts.Contains("number") || opts.Contains("other") {
-			gremAdd = fmt.Sprintf("%s.property('%s',%v)", gremAdd, name, val)
-			gremGet = fmt.Sprintf("%s.has('%s',%v)", gremGet, name, val)
+			gremAdd += fmt.Sprintf(".property('%s',%v)", name, val)
+			gremGet += fmt.Sprintf(".has('%s',%v)", name, val)
 		} else if opts.Contains("[]string") {
 			s := reflect.ValueOf(val)
 			for i := 0; i < s.Len(); i++ {
-				gremAdd = fmt.Sprintf("%s.property('%s','%s')", gremAdd, name, s.Index(i).Interface())
-				gremGet = fmt.Sprintf("%s.has('%s','%s')", gremGet, name, s.Index(i).Interface())
+				gremAdd += fmt.Sprintf(".property('%s','%s')", name, escapeStringy(s.Index(i).Interface()))
+				gremGet += fmt.Sprintf(".has('%s','%s')", name, escapeStringy(s.Index(i).Interface()))
 			}
 		} else if opts.Contains("[]bool") || opts.Contains("[]number") || opts.Contains("[]other") {
 			s := reflect.ValueOf(val)
 			for i := 0; i < s.Len(); i++ {
-				gremAdd = fmt.Sprintf("%s.property('%s',%v)", gremAdd, name, s.Index(i).Interface())
-				gremGet = fmt.Sprintf("%s.has('%s',%v)", gremGet, name, s.Index(i).Interface())
+				gremAdd += fmt.Sprintf(".property('%s',%v)", name, s.Index(i).Interface())
+				gremGet += fmt.Sprintf(".has('%s',%v)", name, s.Index(i).Interface())
 			}
 		} else {
 			err = fmt.Errorf("interface field tag needs recognised option, field: %q, tag: %q", d.Type().Field(i).Name, tag)
@@ -369,6 +353,7 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 	}
 
 	if missingTag {
+		// this err is effectively a warning for gremGet (can be ignored, unless no Id)
 		err = ErrorNoGraphTags
 		return
 	}
@@ -387,40 +372,40 @@ func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err
 	}
 	q = "g." + q
 
-	gutil.Dump("addvq ", q)
 	var resp []Response
-	resp, err = c.Execute(q, nil, nil)
-	if err != nil {
-		panic(err) // XXX
+	if resp, err = c.Execute(q, nil, nil); err != nil {
+		return
 	}
 
 	if len(resp) != 1 {
 		return vert, fmt.Errorf("AddV should receive 1 response, got %d", len(resp))
 	}
 
-	for idx, res := range resp { // XXX one result, so do not need this
-		result, err := graphson.DeserializeListOfVerticesFromBytes(res.Result.Data)
-		if err != nil {
-			panic(err) // XXX
+	for _, res := range resp { // XXX one result, so should not need loop
+		var result []graphson.Vertex
+		if result, err = graphson.DeserializeListOfVerticesFromBytes(res.Result.Data); err != nil {
+			return
 		}
 		if len(result) != 1 {
 			return vert, fmt.Errorf("AddV should receive 1 result, got %d", len(result))
 		}
 
-		gutil.Dump(fmt.Sprintf("aV%02d ", idx), result)
 		vert = result[0]
 	}
 	return
 }
 
-// AddE takes a label, from UUID and to UUID then creates a edge between the two vertex in the graph
-func (c *Client) AddE(label string, fromId, toId string) (resp interface{}, err error) {
+// AddE takes a label, from UUID and to UUID (and optional props map) and creates an edge between the two vertex in the graph
+func (c *Client) AddE(label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
 	if c.conn.isDisposed() {
 		return nil, ErrorConnectionDisposed
 	}
 
-	q := fmt.Sprintf("g.addE('%s').from(g.V().hasId('%s')).to(g.V().hasId('%s')).property('%s','%s')", label, fromId, toId, "ook", "foo")
-	gutil.Warn(q)
+	var propStr string
+	if propStr, err = buildProps(props); err != nil {
+		return
+	}
+	q := fmt.Sprintf("g.addE('%s').from(g.V().hasId('%s')).to(g.V().hasId('%s'))%s", label, fromId, toId, propStr)
 	resp, err = c.Execute(q, nil, nil)
 	return
 
@@ -431,4 +416,39 @@ func (c *Client) Close() {
 	if c.conn != nil {
 		c.conn.close()
 	}
+}
+
+// buildProps converts a map[string]interfaces to be used as properties on an edge
+// (largely taken from https://github.com/intwinelabs/gremgoser)
+func buildProps(props map[string]interface{}) (q string, err error) {
+	for k, v := range props {
+		t := reflect.ValueOf(v).Kind()
+		if t == reflect.String {
+			q += fmt.Sprintf(".property('%s', '%s')", k, escapeStringy(v))
+		} else if t == reflect.Bool || t == reflect.Int || t == reflect.Int8 || t == reflect.Int16 || t == reflect.Int32 || t == reflect.Int64 || t == reflect.Uint || t == reflect.Uint8 || t == reflect.Uint16 || t == reflect.Uint32 || t == reflect.Uint64 || t == reflect.Float32 || t == reflect.Float64 {
+			q += fmt.Sprintf(".property('%s', %v)", k, v)
+		} else if t == reflect.Slice {
+			s := reflect.ValueOf(v)
+			for i := 0; i < s.Len(); i++ {
+				q += fmt.Sprintf(".property('%s', '%s')", k, escapeStringy(s.Index(i).Interface()))
+			}
+		} else {
+			return "", ErrorUnsupportedPropertyType
+		}
+	}
+	return
+}
+
+// escapeStringy takes a string and escapes some characters
+// (largely taken from https://github.com/intwinelabs/gremgoser)
+func escapeStringy(stringy interface{}) string {
+	var buf bytes.Buffer
+	for _, char := range stringy.(string) {
+		switch char {
+		case '\'', '"', '\\':
+			buf.WriteRune('\\')
+		}
+		buf.WriteRune(char)
+	}
+	return buf.String()
 }
