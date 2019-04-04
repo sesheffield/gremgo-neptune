@@ -119,6 +119,7 @@ func DeserializeSingleFromBytes(rawResponse []byte) (gV GenericValue, err error)
 	return genVals[0], nil
 }
 
+// DeserializeCountFromBytes returns the count from the g:List'd database response
 func DeserializeCountFromBytes(rawResponse []byte) (count int64, err error) {
 	var genVal GenericValue
 	if genVal, err = DeserializeSingleFromBytes(rawResponse); err != nil {
@@ -129,7 +130,6 @@ func DeserializeCountFromBytes(rawResponse []byte) (count int64, err error) {
 		err = errors.New("DeserializeCountFromBytes: Expected `g:Int64` type")
 		return
 	}
-	// count = int64(math.Trunc(genVal.Value.(float64)))
 	count = int64(genVal.Value.(float64))
 	return
 }
