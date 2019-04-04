@@ -156,7 +156,7 @@ var res = []testJSON{
 
 func TestGremlin(t *testing.T) {
 	type testGremlin struct {
-		testLabel   string
+		title       string
 		label       string
 		input       interface{}
 		expectAdd   string
@@ -185,44 +185,56 @@ func TestGremlin(t *testing.T) {
 	}
 	StructNoTagsSimple := StructNoTags{Prop: "p", Prop2: "p2"}
 
+	type StructBool struct {
+		Prop bool `graph:"prop,bool"`
+	}
+	StructBoolSimple := StructBool{Prop: true}
+
 	res := []testGremlin{
 		{
-			testLabel: "simple",
+			title:     "simple",
 			input:     StructSaneSimple,
 			label:     "laybull",
 			expectAdd: "addV('laybull').property(id,'simple-id').property('prop','prop-val')",
 			expectGet: "V('laybull').hasId('simple-id').has('prop','prop-val')",
 		},
 		{
-			testLabel: "escaped prop",
+			title:     "escaped prop",
 			input:     StructSaneEscapee,
 			label:     "escapee",
 			expectAdd: `addV('escapee').property(id,'simple-id').property('prop','prop-o\'val')`,
 			expectGet: `V('escapee').hasId('simple-id').has('prop','prop-o\'val')`,
 		},
 		{
-			testLabel: "no-id simple",
+			title:     "no-id simple",
 			input:     StructNoIdSimple,
 			label:     "no-eye-dee",
 			expectAdd: "addV('no-eye-dee').property('prop','prop-val')",
 			expectGet: "V('no-eye-dee').has('prop','prop-val')",
 		},
 		{
-			testLabel: "no-id escaped",
+			title:     "no-id escaped",
 			input:     StructNoIdEscapee,
 			label:     "no-eye-dee-esc",
 			expectAdd: `addV('no-eye-dee-esc').property('prop','prop-o\'val')`,
 			expectGet: `V('no-eye-dee-esc').has('prop','prop-o\'val')`,
 		},
 		{
-			testLabel:   "no-tags error",
+			title:       "no-tags error",
 			input:       StructNoTagsSimple,
 			label:       "no-tags",
 			expectError: ErrorNoGraphTags,
 		},
+		{
+			title:     "check bool type",
+			input:     StructBoolSimple,
+			label:     "typer",
+			expectAdd: `addV('typer').property('prop',true)`,
+			expectGet: `V('typer').has('prop',true)`,
+		},
 	}
 	for _, gTest := range res {
-		Convey("Test "+gTest.testLabel, t, func() {
+		Convey("Test "+gTest.title, t, func() {
 			var err error
 			var outAdd, outGet string
 			if outAdd, outGet, err = GremlinForVertex(gTest.label, gTest.input); err != nil {
