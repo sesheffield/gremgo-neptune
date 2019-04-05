@@ -170,10 +170,6 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 	respNotifier, ok := c.responseNotifier.Load(cursor.ID)
 	c.mu.Unlock()
 	if respNotifier == nil || !ok {
-		// gutil.WarnLev(1, "retrieveNextResponseCtx got NIL respNotifier - panic? %s", cursor.ID)
-		data = c.getCurrentResults(cursor.ID)
-		c.deleteResponse(cursor.ID)
-		//done = true // XXX check this
 		return
 	}
 
