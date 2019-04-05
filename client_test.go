@@ -10,18 +10,7 @@ import (
 
 func TestDecode(t *testing.T) {
 	for _, jsTest := range res {
-		// dec := json.NewDecoder(strings.NewReader(jsTest.js))
-		// dec.UseNumber()
-		// var myStruct interface{}
 		Convey("Test "+jsTest.label, t, func() {
-			// if _, err := decodeRawSeq(int(0), dec, "t", tree{"meta"}, &myStruct, metaSeq); err != nil {
-			// 	if jsTest.errRegex == nil {
-			// 		So(err, ShouldBeNil)
-			// 		// t.Errorf("Test %q: Parsing unexpectedly failed, got %v", jsTest.label, err)
-			// 	} else { //if !jsTest.errRegex.MatchString(err.Error()) {
-			// 		// t.Errorf("Test %q: Parsing failed with unexpected error, tested-for: `%v`, test-said: `%v`", jsTest.label, jsTest.errRegex, err)
-			// 		So(err, shouldMatch, jsTest.errRegex)
-			// 	}
 			var myStruct interface{}
 			var err error
 			if jsTest.parseType == "edge" {
@@ -32,33 +21,19 @@ func TestDecode(t *testing.T) {
 			if err != nil {
 				if jsTest.errRegex == nil {
 					So(err, ShouldBeNil)
-					// t.Errorf("Test %q: Parsing unexpectedly failed, got %v", jsTest.label, err)
-				} else { //if !jsTest.errRegex.MatchString(err.Error()) {
-					// t.Errorf("Test %q: Parsing failed with unexpected error, tested-for: `%v`, test-said: `%v`", jsTest.label, jsTest.errRegex, err)
+				} else {
 					So(err, shouldMatch, jsTest.errRegex)
 				}
-			} else { // err == nil
+			} else {
+				// err == nil
 				if jsTest.errRegex != nil {
-					// scs.Dump(myStruct)
 					So(myStruct, ShouldResemble, "Error matching: "+jsTest.errRegex.String())
 					So(err, ShouldNotBeNil)
-					// t.Errorf("Test %q: Parsing ok but should have failed, got %v", jsTest.label, err)
 				} else if jsTest.keyOf != nil {
 
 				} else if jsTest.res != nil {
 					So(myStruct, ShouldResemble, jsTest.res)
 				}
-				// strType := reflect.TypeOf(myStruct).String()
-				// if jsTest.res != nil {
-				// 	So(myStruct, ShouldResemble, jsTest.res)
-				// } else if strings.HasSuffix(strType, ".vertex") {
-				// 	// So(len(myStruct.([]vertex)), ShouldEqual, jsTest.hasLen)
-				// 	So(len(myStruct.([]graphson.Vertex)), ShouldEqual, jsTest.hasLen)
-				// } else if strings.HasSuffix(strType, ".edge") {
-				// 	// So(len(myStruct.([]edge)), ShouldEqual, jsTest.hasLen)
-				// } else {
-				// 	So(strType, ShouldBeIn, []string{"vertex", "edge"})
-				// }
 			}
 		})
 	}
@@ -169,68 +144,71 @@ func TestGremlin(t *testing.T) {
 		Prop       string `graph:"prop,string"`
 		IgnoreProp string
 	}
-	StructSaneSimple := StructSane{Id: "simple-id", Prop: "prop-val", IgnoreProp: "ignore-prop"}
-	StructSaneEscapee := StructSane{Id: "simple-id", Prop: "prop-o'val", IgnoreProp: "ignore-prop"}
-
 	type StructSaneNoId struct {
 		Prop       string `graph:"prop,string"`
 		IgnoreProp string
 	}
-	StructNoIdSimple := StructSaneNoId{Prop: "prop-val", IgnoreProp: "ignore-prop"}
-	StructNoIdEscapee := StructSaneNoId{Prop: "prop-o'val", IgnoreProp: "ignore-prop"}
-
 	type StructNoTags struct {
 		Prop  string
 		Prop2 string
 	}
-	StructNoTagsSimple := StructNoTags{Prop: "p", Prop2: "p2"}
+	type StructOtherId struct {
+		Idee string `graph:"id,id"`
+		Prop string `graph:"prop,string"`
+	}
 
 	type StructBool struct {
 		Prop bool `graph:"prop,bool"`
 	}
-	StructBoolSimple := StructBool{Prop: true}
 
 	res := []testGremlin{
 		{
 			title:     "simple",
-			input:     StructSaneSimple,
+			input:     StructSane{Id: "simple-id", Prop: "prop-val", IgnoreProp: "ignore-prop"},
 			label:     "laybull",
 			expectAdd: "addV('laybull').property(id,'simple-id').property('prop','prop-val')",
 			expectGet: "V('laybull').hasId('simple-id').has('prop','prop-val')",
 		},
 		{
 			title:     "escaped prop",
-			input:     StructSaneEscapee,
+			input:     StructSane{Id: "simple-id", Prop: "prop-o'val", IgnoreProp: "ignore-prop"},
 			label:     "escapee",
 			expectAdd: `addV('escapee').property(id,'simple-id').property('prop','prop-o\'val')`,
 			expectGet: `V('escapee').hasId('simple-id').has('prop','prop-o\'val')`,
 		},
 		{
 			title:     "no-id simple",
-			input:     StructNoIdSimple,
+			input:     StructSaneNoId{Prop: "prop-val", IgnoreProp: "ignore-prop"},
 			label:     "no-eye-dee",
 			expectAdd: "addV('no-eye-dee').property('prop','prop-val')",
 			expectGet: "V('no-eye-dee').has('prop','prop-val')",
 		},
 		{
 			title:     "no-id escaped",
-			input:     StructNoIdEscapee,
+			input:     StructSaneNoId{Prop: "prop-o'val", IgnoreProp: "ignore-prop"},
 			label:     "no-eye-dee-esc",
 			expectAdd: `addV('no-eye-dee-esc').property('prop','prop-o\'val')`,
 			expectGet: `V('no-eye-dee-esc').has('prop','prop-o\'val')`,
 		},
 		{
 			title:       "no-tags error",
-			input:       StructNoTagsSimple,
+			input:       StructNoTags{Prop: "p", Prop2: "p2"},
 			label:       "no-tags",
 			expectError: ErrorNoGraphTags,
 		},
 		{
 			title:     "check bool type",
-			input:     StructBoolSimple,
+			input:     StructBool{Prop: true},
 			label:     "typer",
 			expectAdd: `addV('typer').property('prop',true)`,
 			expectGet: `V('typer').has('prop',true)`,
+		},
+		{
+			title:     "check non-Id ID",
+			input:     StructOtherId{Idee: "idee-id", Prop: "prop-val"},
+			label:     "other-field",
+			expectAdd: `addV('other-field').property(id,'idee-id').property('prop','prop-val')`,
+			expectGet: `V('other-field').hasId('idee-id').has('prop','prop-val')`,
 		},
 	}
 	for _, gTest := range res {
