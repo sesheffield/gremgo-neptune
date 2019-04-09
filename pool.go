@@ -448,6 +448,27 @@ func (p *Pool) GetCount(q string) (i int64, err error) {
 	return pc.Client.GetCount(q, nil, nil)
 }
 
+func (p *Pool) GetStringList(q string) (vals []string, err error) {
+	var pc *conn
+	if pc, err = p.conn(); err != nil {
+		err = errors.Wrap(err, "GetStringList: Failed p.conn")
+		return
+	}
+	defer p.putConn(pc, err)
+	return pc.Client.GetStringList(q, nil, nil)
+}
+
+// GetProperties returns a map of vertex properties
+func (p *Pool) GetProperties(q string) (vals map[string][]interface{}, err error) {
+	var pc *conn
+	if pc, err = p.conn(); err != nil {
+		err = errors.Wrap(err, "GetProperties: Failed p.conn")
+		return
+	}
+	defer p.putConn(pc, err)
+	return pc.Client.GetProperties(q, nil, nil)
+}
+
 // Close closes the pool.
 func (p *Pool) Close() {
 	p.mu.Lock()

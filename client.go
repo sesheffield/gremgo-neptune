@@ -284,6 +284,37 @@ func (c *Client) GetCount(query string, bindings, rebindings map[string]string) 
 	return
 }
 
+// GetStringList returns the list of string elements returned by an Execute() (e.g. from `...().properties('p').value()`)
+func (c *Client) GetStringList(query string, bindings, rebindings map[string]string) (vals []string, err error) {
+	var res []Response
+	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+		return
+	}
+	for _, resN := range res {
+		var valsN []string
+		if valsN, err = graphson.DeserializeStringListFromBytes(resN.Result.Data); err != nil {
+			return
+		}
+		vals = append(vals, valsN...)
+	}
+	return
+}
+
+// GetProperties returns a map of string to interface{} returned by an Execute() for vertex .properties()
+func (c *Client) GetProperties(query string, bindings, rebindings map[string]string) (vals map[string][]interface{}, err error) {
+	var res []Response
+	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+		return
+	}
+	vals = make(map[string][]interface{})
+	for _, resN := range res {
+		if err = graphson.DeserializePropertiesFromBytes(resN.Result.Data, vals); err != nil {
+			return
+		}
+	}
+	return
+}
+
 // GremlinForVertex returns the addV()... and V()... gremlin commands for `data`
 // Because of possible multiples, it does not start with `g.` (it probably should? XXX )
 // (largely taken from https://github.com/intwinelabs/gremgoser)
@@ -332,7 +363,7 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 				gremGet += fmt.Sprintf(".has('%s','%s')", name, escapeStringy(val))
 			}
 		} else if opts.Contains("bool") || opts.Contains("number") || opts.Contains("other") {
-			gremAdd += fmt.Sprintf(".property('%s',%v)", name, val)
+			gremAdd += fmt.Sprintf(".property(single,'%s',%v)", name, val)
 			gremGet += fmt.Sprintf(".has('%s',%v)", name, val)
 		} else if opts.Contains("[]string") {
 			s := reflect.ValueOf(val)

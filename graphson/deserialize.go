@@ -44,7 +44,7 @@ func DeserializeListOfVerticesFromBytes(rawResponse []byte) ([]Vertex, error) {
 	}
 
 	if metaResponse.Type != "g:List" {
-		return response, errors.New("Expected `g:List` type")
+		return response, errors.New("DeserializeListOfVerticesFromBytes: Expected `g:List` type")
 	}
 
 	return metaResponse.Value, nil
@@ -64,7 +64,7 @@ func DeserializeListOfEdgesFromBytes(rawResponse []byte) (Edges, error) {
 	}
 
 	if metaResponse.Type != "g:List" {
-		return response, errors.New("Expected `g:List` type")
+		return response, errors.New("DeserializeListOfEdgesFromBytes: Expected `g:List` type")
 	}
 
 	return metaResponse.Value, nil
@@ -82,10 +82,65 @@ func DeserializeMapFromBytes(rawResponse []byte) (resMap map[string]interface{},
 	}
 
 	if metaResponse.Type != "g:Map" {
-		return resMap, errors.New("Expected `g:Map` type")
+		return resMap, errors.New("DeserializeMapFromBytes: Expected `g:Map` type")
 	}
 
 	return resMap, nil
+}
+
+// DeserializePropertiesFromBytes is for converting vertex .properties() results into a map
+func DeserializePropertiesFromBytes(rawResponse []byte, resMap map[string][]interface{}) (err error) {
+	var metaResponse GList
+	if len(rawResponse) == 0 {
+		return
+	}
+	dec := json.NewDecoder(bytes.NewReader(rawResponse))
+	dec.DisallowUnknownFields()
+	if err = dec.Decode(&metaResponse); err != nil {
+		return
+	}
+
+	if metaResponse.Type != "g:List" {
+		return errors.New("DeserializePropertiesFromBytes: Expected `g:List` type")
+	}
+	var props []VertexProperty
+	if err = json.Unmarshal(metaResponse.Value, &props); err != nil {
+		return
+	}
+
+	for _, prop := range props {
+		if _, ok := resMap[prop.Value.Label]; !ok {
+			resMap[prop.Value.Label] = []interface{}{prop.Value.Value}
+		} else {
+			resMap[prop.Value.Label] = append(resMap[prop.Value.Label], prop.Value.Value)
+		}
+	}
+
+	return
+}
+
+// DeserializeStringListFromBytes get a g:List value which should be a a list of strings, return those
+func DeserializeStringListFromBytes(rawResponse []byte) (vals []string, err error) {
+	var metaResponse GList
+	if len(rawResponse) == 0 {
+		err = errors.New("DeserializeStringListFromBytes: nothing to decode")
+		return
+	}
+	dec := json.NewDecoder(bytes.NewReader(rawResponse))
+	dec.DisallowUnknownFields()
+	if err = dec.Decode(&metaResponse); err != nil {
+		return
+	}
+
+	if metaResponse.Type != "g:List" {
+		err = errors.New("DeserializeStringListFromBytes: Expected `g:List` type")
+		return
+	}
+
+	if err = json.Unmarshal(metaResponse.Value, &vals); err != nil {
+		return
+	}
+	return
 }
 
 // DeserializeSingleFromBytes get a g:List value which should be a singular item, returns that item
