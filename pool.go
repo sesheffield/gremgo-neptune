@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gedge/gremgo-neptune/graphson"
+	"github.com/ONSdigital/graphson"
 	"github.com/pkg/errors"
 )
 
