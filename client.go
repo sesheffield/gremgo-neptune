@@ -278,7 +278,7 @@ func (c *Client) GetCount(query string, bindings, rebindings map[string]string) 
 		err = errors.New("GetCount: expected one result, got zero")
 		return
 	}
-	if i, err = graphson.DeserializeCountFromBytes(res[0].Result.Data); err != nil {
+	if i, err = graphson.DeserializeNumber(res[0].Result.Data); err != nil {
 		return
 	}
 	return
