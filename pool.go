@@ -335,6 +335,9 @@ func (p *Pool) connectionCleaner() {
 
 // Execute formats a raw Gremlin query, sends it to Gremlin Server, and returns the result.
 func (p *Pool) Execute(query string, bindings, rebindings map[string]string) (resp []Response, err error) {
+	return p.ExecuteCtx(context.Background(), query, bindings, rebindings)
+}
+func (p *Pool) ExecuteCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	pc, err := p.conn()
 	if err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
@@ -342,7 +345,7 @@ func (p *Pool) Execute(query string, bindings, rebindings map[string]string) (re
 	defer func() {
 		p.putConn(pc, err)
 	}()
-	resp, err = pc.Client.executeRequest(query, bindings, rebindings)
+	resp, err = pc.Client.executeRequestCtx(ctx, query, bindings, rebindings)
 	return
 }
 
@@ -367,12 +370,15 @@ func (p *Pool) ExecuteFile(path string, bindings, rebindings map[string]string) 
 
 // AddV
 func (p *Pool) AddV(query string, i interface{}) (resp graphson.Vertex, err error) {
+	return p.AddVertexCtx(context.Background(), query, i)
+}
+func (p *Pool) AddVertexCtx(ctx context.Context, query string, i interface{}) (resp graphson.Vertex, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.AddV(query, i)
+	return pc.Client.AddVertexCtx(ctx, query, i)
 }
 
 // Get
@@ -421,52 +427,70 @@ func (p *Pool) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson
 
 // AddE
 func (p *Pool) AddE(label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
+	return p.AddEdgeCtx(context.Background(), label, fromId, toId, props)
+}
+
+func (p *Pool) AddEdgeCtx(ctx context.Context, label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
+	// AddEdgeCtx
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.AddE(label, fromId, toId, props)
+	return pc.Client.AddEdgeCtx(ctx, label, fromId, toId, props)
 }
 
 // GetE
 func (p *Pool) GetE(q string) (resp interface{}, err error) {
+	return p.GetEdgeCtx(context.Background(), q)
+}
+
+func (p *Pool) GetEdgeCtx(ctx context.Context, q string) (resp interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return resp, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetE(q)
+	return pc.Client.GetEdgeCtx(ctx, q)
 }
 
 func (p *Pool) GetCount(q string) (i int64, err error) {
+	return p.GetCountCtx(context.Background(), q)
+}
+func (p *Pool) GetCountCtx(ctx context.Context, q string) (i int64, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
 		return 0, errors.Wrap(err, "Failed p.conn")
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetCount(q, nil, nil)
+	return pc.Client.GetCountCtx(ctx, q, nil, nil)
 }
 
 func (p *Pool) GetStringList(q string) (vals []string, err error) {
+	return p.GetStringListCtx(context.Background(), q)
+}
+func (p *Pool) GetStringListCtx(ctx context.Context, q string) (vals []string, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		err = errors.Wrap(err, "GetStringList: Failed p.conn")
+		err = errors.Wrap(err, "GetStringListCtx: Failed p.conn")
 		return
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetStringList(q, nil, nil)
+	return pc.Client.GetStringListCtx(ctx, q, nil, nil)
 }
 
 // GetProperties returns a map of vertex properties
 func (p *Pool) GetProperties(q string) (vals map[string][]interface{}, err error) {
+	return p.GetPropertiesCtx(context.Background(), q)
+}
+func (p *Pool) GetPropertiesCtx(ctx context.Context, q string) (vals map[string][]interface{}, err error) {
 	var pc *conn
 	if pc, err = p.conn(); err != nil {
-		err = errors.Wrap(err, "GetProperties: Failed p.conn")
+		err = errors.Wrap(err, "GetPropertiesCtx: Failed p.conn")
 		return
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetProperties(q, nil, nil)
+	return pc.Client.GetPropertiesCtx(ctx, q, nil, nil)
 }
 
 // Close closes the pool.

@@ -152,10 +152,13 @@ func (c *Client) authenticate(requestID string) (err error) {
 
 // Execute formats a raw Gremlin query, sends it to Gremlin Server, and returns the result.
 func (c *Client) Execute(query string, bindings, rebindings map[string]string) (resp []Response, err error) {
+	return c.ExecuteCtx(context.Background(), query, bindings, rebindings)
+}
+func (c *Client) ExecuteCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []Response, err error) {
 	if c.conn.isDisposed() {
 		return resp, ErrorConnectionDisposed
 	}
-	resp, err = c.executeRequest(query, bindings, rebindings)
+	resp, err = c.executeRequestCtx(ctx, query, bindings, rebindings)
 	return
 }
 
@@ -241,12 +244,15 @@ func (c *Client) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphs
 
 // GetE formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
 func (c *Client) GetE(query string) (res graphson.Edges, err error) {
+	return c.GetEdgeCtx(context.Background(), query)
+}
+func (c *Client) GetEdgeCtx(ctx context.Context, query string) (res graphson.Edges, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
 	}
 
-	resp, err := c.executeRequest(query, nil, nil)
+	resp, err := c.executeRequestCtx(ctx, query, nil, nil)
 	if err != nil {
 		return
 	}
@@ -261,14 +267,16 @@ func (c *Client) GetE(query string) (res graphson.Edges, err error) {
 		}
 		res = append(res, resN...)
 	}
-
 	return
 }
 
 // GetCount returns the count element returned by an Execute()
 func (c *Client) GetCount(query string, bindings, rebindings map[string]string) (i int64, err error) {
+	return c.GetCountCtx(context.Background(), query, bindings, rebindings)
+}
+func (c *Client) GetCountCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (i int64, err error) {
 	var res []Response
-	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+	if res, err = c.ExecuteCtx(ctx, query, bindings, rebindings); err != nil {
 		return
 	}
 	if len(res) > 1 {
@@ -286,8 +294,11 @@ func (c *Client) GetCount(query string, bindings, rebindings map[string]string) 
 
 // GetStringList returns the list of string elements returned by an Execute() (e.g. from `...().properties('p').value()`)
 func (c *Client) GetStringList(query string, bindings, rebindings map[string]string) (vals []string, err error) {
+	return c.GetStringListCtx(context.Background(), query, bindings, rebindings)
+}
+func (c *Client) GetStringListCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (vals []string, err error) {
 	var res []Response
-	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+	if res, err = c.ExecuteCtx(ctx, query, bindings, rebindings); err != nil {
 		return
 	}
 	for _, resN := range res {
@@ -302,8 +313,11 @@ func (c *Client) GetStringList(query string, bindings, rebindings map[string]str
 
 // GetProperties returns a map of string to interface{} returned by an Execute() for vertex .properties()
 func (c *Client) GetProperties(query string, bindings, rebindings map[string]string) (vals map[string][]interface{}, err error) {
+	return c.GetPropertiesCtx(context.Background(), query, bindings, rebindings)
+}
+func (c *Client) GetPropertiesCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (vals map[string][]interface{}, err error) {
 	var res []Response
-	if res, err = c.Execute(query, bindings, rebindings); err != nil {
+	if res, err = c.ExecuteCtx(ctx, query, bindings, rebindings); err != nil {
 		return
 	}
 	vals = make(map[string][]interface{})
@@ -393,6 +407,9 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 
 // AddV takes a label and an interface and adds it as a vertex to the graph
 func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err error) {
+	return c.AddVertexCtx(context.Background(), label, data)
+}
+func (c *Client) AddVertexCtx(ctx context.Context, label string, data interface{}) (vert graphson.Vertex, err error) {
 	if c.conn.isDisposed() {
 		return vert, ErrorConnectionDisposed
 	}
@@ -404,7 +421,7 @@ func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err
 	q = "g." + q
 
 	var resp []Response
-	if resp, err = c.Execute(q, nil, nil); err != nil {
+	if resp, err = c.ExecuteCtx(ctx, q, nil, nil); err != nil {
 		return
 	}
 
@@ -428,6 +445,9 @@ func (c *Client) AddV(label string, data interface{}) (vert graphson.Vertex, err
 
 // AddE takes a label, from UUID and to UUID (and optional props map) and creates an edge between the two vertex in the graph
 func (c *Client) AddE(label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
+	return c.AddEdgeCtx(context.Background(), label, fromId, toId, props)
+}
+func (c *Client) AddEdgeCtx(ctx context.Context, label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
 	if c.conn.isDisposed() {
 		return nil, ErrorConnectionDisposed
 	}
@@ -437,7 +457,7 @@ func (c *Client) AddE(label, fromId, toId string, props map[string]interface{}) 
 		return
 	}
 	q := fmt.Sprintf("g.addE('%s').from(g.V().hasId('%s')).to(g.V().hasId('%s'))%s", label, fromId, toId, propStr)
-	resp, err = c.Execute(q, nil, nil)
+	resp, err = c.ExecuteCtx(ctx, q, nil, nil)
 	return
 
 }
