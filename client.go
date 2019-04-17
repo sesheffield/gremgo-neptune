@@ -380,7 +380,7 @@ func GremlinForVertex(label string, data interface{}) (gremAdd, gremGet string, 
 				gremGet += fmt.Sprintf(".has('%s','%s')", name, escapeStringy(val))
 			}
 		} else if opts.Contains("bool") || opts.Contains("number") || opts.Contains("other") {
-			gremAdd += fmt.Sprintf(".property(single,'%s',%v)", name, val)
+			gremAdd += fmt.Sprintf(".property('%s',%v)", name, val)
 			gremGet += fmt.Sprintf(".has('%s',%v)", name, val)
 		} else if opts.Contains("[]string") {
 			s := reflect.ValueOf(val)
