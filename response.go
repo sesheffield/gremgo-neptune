@@ -67,7 +67,6 @@ func (c *Client) handleResponse(msg []byte) (err error) {
 	if resp.Status.Code == statusAuthenticate { //Server request authentication
 		return c.authenticate(resp.RequestID)
 	}
-
 	c.saveResponse(resp, err)
 	return
 }
@@ -112,8 +111,8 @@ func (c *Client) retrieveResponse(id string) (data []Response, err error) {
 	resp, _ := c.responseNotifier.Load(id)
 	if err = <-resp.(chan error); err == nil {
 		data = c.getCurrentResults(id)
-		c.cleanResults(id, resp.(chan error), nil)
 	}
+	c.cleanResults(id, resp.(chan error), nil)
 	return
 }
 
@@ -152,11 +151,11 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 	respNotifier, _ := c.responseNotifier.Load(id)
 	select {
 	case err = <-respNotifier.(chan error):
+		defer c.cleanResults(id, respNotifier.(chan error), nil)
 		if err != nil {
 			return
 		}
 		data = c.getCurrentResults(id)
-		c.cleanResults(id, respNotifier.(chan error), nil)
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
@@ -180,11 +179,11 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 
 	select {
 	case err = <-respNotifier.(chan error):
+		defer c.cleanResults(cursor.ID, respNotifier.(chan error), chunkNotifier)
 		if err != nil {
 			return
 		}
 		data = c.getCurrentResults(cursor.ID)
-		c.cleanResults(cursor.ID, respNotifier.(chan error), chunkNotifier)
 		done = true
 	case <-chunkNotifier:
 		c.mu.Lock()

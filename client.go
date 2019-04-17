@@ -128,7 +128,10 @@ func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bind
 	}
 	c.responseNotifier.Store(id, make(chan error, 1))
 	c.chunkNotifier.Store(id, make(chan bool, 10))
-	c.dispatchRequestCtx(ctx, msg)
+	if c.dispatchRequestCtx(ctx, msg); err != nil {
+		err = errors.Wrap(err, "executeRequestCursorCtx")
+		return
+	}
 	cursor.ID = id
 	return
 }
@@ -182,7 +185,7 @@ func (c *Client) Get(query string) (res []graphson.Vertex, err error) {
 	return c.GetCtx(context.Background(), query)
 }
 
-// GetCtx as Get with context
+// GetCtx - execute a gremlin command and return the response as vertices
 func (c *Client) GetCtx(ctx context.Context, query string) (res []graphson.Vertex, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
@@ -212,7 +215,7 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 	return
 }
 
-// GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
+// GetCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
 func (c *Client) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
