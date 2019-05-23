@@ -77,7 +77,7 @@ func TestGremlin(t *testing.T) {
 			title:     "check types",
 			input:     StructTypes{PropBool: true, PropArray: []string{"ook", "foo"}},
 			label:     "typer",
-			expectAdd: `addV('typer').property(single,'prop',true).property('ps','ook').property('ps','foo')`,
+			expectAdd: `addV('typer').property('prop',true).property('ps','ook').property('ps','foo')`,
 			expectGet: `V('typer').has('prop',true).has('ps','ook').has('ps','foo')`,
 		},
 		{
