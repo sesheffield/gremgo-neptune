@@ -246,10 +246,10 @@ func (c *Client) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphs
 }
 
 // GetE formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
-func (c *Client) GetE(query string) (res graphson.Edges, err error) {
+func (c *Client) GetE(query string) (res []graphson.Edge, err error) {
 	return c.GetEdgeCtx(context.Background(), query)
 }
-func (c *Client) GetEdgeCtx(ctx context.Context, query string) (res graphson.Edges, err error) {
+func (c *Client) GetEdgeCtx(ctx context.Context, query string) (res []graphson.Edge, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
@@ -264,7 +264,7 @@ func (c *Client) GetEdgeCtx(ctx context.Context, query string) (res graphson.Edg
 	}
 
 	for _, item := range resp {
-		var resN graphson.Edges
+		var resN []graphson.Edge
 		if resN, err = graphson.DeserializeListOfEdgesFromBytes(item.Result.Data); err != nil {
 			return
 		}
