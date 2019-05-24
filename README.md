@@ -39,7 +39,7 @@ func main() {
         log.Fatal("Lost connection to the database: " + err.Error())
     }(errs) // Example of connection error handling logic
 
-    dialer := gremgo.NewDialer("ws://127.0.0.1:8182") // Returns a WebSocket dialer to connect to Gremlin Server
+    dialer := gremgo.NewDialer("ws://127.0.0.1:8182/gremlin") // Returns a WebSocket dialer to connect to Gremlin Server
     g, err := gremgo.Dial(dialer, errs) // Returns a gremgo client to interact with
     if err != nil {
         fmt.Println(err)
@@ -63,8 +63,8 @@ func main() {
 
 Authentication
 ==========
-The plugin accepts authentication creating a secure dialer where credentials are setted.
-If the server where are you trying to connect needs authentication and you do not provide the 
+The plugin accepts authentication creating a secure dialer where credentials are set.
+If the server where are you trying to connect needs authentication and you do not provide the
 credentials the complement will panic.
 
 ```go
@@ -84,7 +84,7 @@ func main() {
         log.Fatal("Lost connection to the database: " + err.Error())
     }(errs) // Example of connection error handling logic
 
-    dialer := gremgo.NewSecureDialer("127.0.0.1:8182", "username", "password") // Returns a WebSocket dialer to connect to Gremlin Server
+    dialer := gremgo.NewSecureDialer("ws://127.0.0.1:8182/gremlin", "username", "password") // Returns a WebSocket dialer to connect to Gremlin Server
     g, err := gremgo.Dial(dialer, errs) // Returns a gremgo client to interact with
     if err != nil {
         fmt.Println(err)
