@@ -401,28 +401,28 @@ func (p *Pool) GetCtx(ctx context.Context, query string) (resp interface{}, err 
 	return pc.Client.GetCtx(ctx, query)
 }
 
-// GetCursorCtx initiates a query on the database, returning a cursor to iterate over the results
-func (p *Pool) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
+// OpenCursorCtx initiates a query on the database, returning a cursor to iterate over the results
+func (p *Pool) OpenCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		err = errors.Wrap(err, "GetCursorCtx: Failed p.connCtx")
 		return
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.GetCursorCtx(ctx, query)
+	return pc.Client.OpenCursorCtx(ctx, query)
 }
 
-// NextCursorCtx returns the next set of results for the cursor
+// ReadCursorCtx returns the next set of results for the cursor
 // - `res` returns vertices (and may be empty when results were read by a previous call - this is normal)
 // - `eof` will be true when no more results are available (`res` may still have results)
-func (p *Pool) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
+func (p *Pool) ReadCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var pc *conn
 	if pc, err = p.connCtx(ctx); err != nil {
 		err = errors.Wrap(err, "NextCtx: Failed p.connCtx")
 		return
 	}
 	defer p.putConn(pc, err)
-	return pc.Client.NextCursorCtx(ctx, cursor)
+	return pc.Client.ReadCursorCtx(ctx, cursor)
 }
 
 // AddE

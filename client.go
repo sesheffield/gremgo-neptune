@@ -215,8 +215,8 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 	return
 }
 
-// GetCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
-func (c *Client) GetCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
+// OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
+func (c *Client) OpenCursorCtx(ctx context.Context, query string) (cursor Cursor, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
@@ -228,10 +228,10 @@ func (c *Client) GetCursorCtx(ctx context.Context, query string) (cursor Cursor,
 	return
 }
 
-// NextCursorCtx returns the next set of results, deserialized as []Vertex, for the cursor
+// ReadCursorCtx returns the next set of results, deserialized as []Vertex, for the cursor
 // - `res` may be empty when results were read by a previous call
 // - `eof` will be true when no more results are available
-func (c *Client) NextCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
+func (c *Client) ReadCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
 		err = errors.Wrapf(err, "NextCursorCtx: %s", cursor.ID)
@@ -438,7 +438,7 @@ func (c *Client) AddVertexCtx(ctx context.Context, label string, data interface{
 			return
 		}
 		if len(result) != 1 {
-			return vert, fmt.Errorf("AddV should receive 1 result, got %d", len(result))
+			return vert, fmt.Errorf("AddV should receive 1 vertex, got %d", len(result))
 		}
 
 		vert = result[0]
