@@ -101,6 +101,7 @@ func TestGremlin(t *testing.T) {
 				// err is nil
 				if gTest.expectError != nil {
 					So(err, ShouldNotBeNil)
+					So(err, ShouldEqual, gTest.expectError)
 				} else {
 					So(outAdd, ShouldEqual, gTest.expectAdd)
 					So(outGet, ShouldEqual, gTest.expectGet)
