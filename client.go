@@ -234,12 +234,12 @@ func (c *Client) OpenCursorCtx(ctx context.Context, query string) (cursor Cursor
 func (c *Client) ReadCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
-		err = errors.Wrapf(err, "NextCursorCtx: %s", cursor.ID)
+		err = errors.Wrapf(err, "ReadCursorCtx: %s", cursor.ID)
 		return
 	}
 
 	if res, err = c.deserializeResponseToVertices(resp); err != nil {
-		err = errors.Wrapf(err, "NextCursorCtx: %s", cursor.ID)
+		err = errors.Wrapf(err, "ReadCursorCtx: %s", cursor.ID)
 		return
 	}
 	return
