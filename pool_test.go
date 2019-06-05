@@ -317,12 +317,14 @@ func TestConnectionCleaner(t *testing.T) {
 	p.mu.Unlock()
 
 	time.Sleep(1010 * time.Millisecond)
+	p.mu.Lock()
 	if len(p.freeConns) != 1 {
 		t.Errorf("Expected 1 freeConns connection after clean, got %d", len(p.freeConns))
 		for _, pc := range p.freeConns {
 			fmt.Println(pc.t)
 		}
 	}
+	p.mu.Unlock()
 
 	if p.freeConns[0].t != valid.t {
 		t.Error("Expected the valid connection to remain in freeConns pool")
@@ -360,6 +362,7 @@ func TestPurgeErrorClosedConnection(t *testing.T) {
 	p.mu.Unlock()
 	time.Sleep(1010 * time.Millisecond)
 
+	p.mu.Lock()
 	if len(p.freeConns) != 1 {
 		t.Errorf("Expected 1 freeConns connection after clean, got %d", len(p.freeConns))
 	}
@@ -367,6 +370,7 @@ func TestPurgeErrorClosedConnection(t *testing.T) {
 	if p.freeConns[0] != valid {
 		t.Error("Expected valid connection to remain in pool")
 	}
+	p.mu.Unlock()
 }
 
 func TestPooledConnectionClose(t *testing.T) {
