@@ -450,10 +450,10 @@ func TestVert(t *testing.T) {
 		var err error
 		if expect.callType == "AddV" {
 			v = make([]graphson.Vertex, 1)
-			v[0], err = p.AddVertexCtx(timeoutCtx, expect.vertLabel, expect.vert)
+			v[0], err = p.AddVertexCtx(timeoutCtx, expect.vertLabel, expect.vert, nil, nil)
 		} else if expect.callType == "Get" {
 			var resp interface{}
-			resp, err = p.GetCtx(timeoutCtx, "g.V()")
+			resp, err = p.GetCtx(timeoutCtx, "g.V()", nil, nil)
 			if err == nil {
 				for _, respN := range resp.([]graphson.Vertex) {
 					v = append(v, respN)
@@ -688,13 +688,13 @@ func TestCursor(t *testing.T) {
 		},
 	}
 
-	for testIdx, expect := range testData {
-		testPrefix := fmt.Sprintf("Test[%d]<%s>: ", testIdx, expect.testLabel)
+	for _, expect := range testData {
+		testPrefix := fmt.Sprintf("Test<%s>: ", expect.testLabel)
 		errs := make(chan error)
 		p, dialMock := MockNewPoolWithDialerCtx(context.Background(), "ws://0", errs, t, nil, expect.wsResponses)
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-		cursor, err := p.OpenCursorCtx(timeoutCtx, "g.V()")
+		cursor, err := p.OpenCursorCtx(timeoutCtx, "g.V()", nil, nil)
 		if err != nil {
 			t.Errorf(testPrefix+"Expected OpenCursorCtx err to be nil, but got: %s", err)
 		}
