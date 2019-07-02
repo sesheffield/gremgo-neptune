@@ -32,10 +32,6 @@ type Client struct {
 	Errored          bool
 }
 
-type Cursor struct {
-	ID string
-}
-
 // NewDialer returns a WebSocket dialer to use when connecting to Gremlin Server
 func NewDialer(host string, configs ...DialerConfig) (dialer *Ws) {
 	dialer = &Ws{
@@ -114,7 +110,7 @@ func (c *Client) executeRequestCtx(ctx context.Context, query string, bindings, 
 	}
 	return
 }
-func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor Cursor, err error) {
+func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor *Cursor, err error) {
 	var req request
 	var id string
 	if req, id, err = prepareRequest(query, bindings, rebindings); err != nil {
@@ -132,7 +128,11 @@ func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bind
 		err = errors.Wrap(err, "executeRequestCursorCtx")
 		return
 	}
-	cursor.ID = id
+
+	cursor = &Cursor{
+		ID:     id,
+		client: c,
+	}
 	return
 }
 
@@ -216,7 +216,7 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 }
 
 // OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
-func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor Cursor, err error) {
+func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor *Cursor, err error) {
 	if c.conn.isDisposed() {
 		err = ErrorConnectionDisposed
 		return
@@ -231,7 +231,7 @@ func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebi
 // ReadCursorCtx returns the next set of results, deserialized as []Vertex, for the cursor
 // - `res` may be empty when results were read by a previous call
 // - `eof` will be true when no more results are available
-func (c *Client) ReadCursorCtx(ctx context.Context, cursor Cursor) (res []graphson.Vertex, eof bool, err error) {
+func (c *Client) ReadCursorCtx(ctx context.Context, cursor *Cursor) (res []graphson.Vertex, eof bool, err error) {
 	var resp []Response
 	if resp, eof, err = c.retrieveNextResponseCtx(ctx, cursor); err != nil {
 		err = errors.Wrapf(err, "ReadCursorCtx: %s", cursor.ID)

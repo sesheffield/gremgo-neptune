@@ -165,7 +165,7 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 
 // retrieveNextResponseCtx retrieves the current response (may be empty!) saved by saveResponse,
 //  `done` is true when the results are complete (eof)
-func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (data []Response, done bool, err error) {
+func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor *Cursor) (data []Response, done bool, err error) {
 	c.mu.Lock()
 	respNotifier, ok := c.responseNotifier.Load(cursor.ID)
 	c.mu.Unlock()
@@ -194,6 +194,7 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
+
 	return
 }
 
