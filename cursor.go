@@ -19,18 +19,32 @@ type Cursor struct {
 	client *Client
 }
 
+// Read a string response from the cursor, reading from the buffer of previously retrieved responses
+// when possible. When the buffer is empty, Read uses the cursor's client to retrieve further
+// responses from the database. As this function does not take context, a number of attempts
+// is hardcoded in refillBuffer() to prevent an infinite wait for further responses.
 func (c *Cursor) Read() (string, error) {
-	if len(c.buffer) > 0 {
-		s := c.buffer[0] + "\n"
-
-		if len(c.buffer) > 1 {
-			c.buffer = c.buffer[1:]
-		} else {
-			c.buffer = []string{}
+	if len(c.buffer) == 0 {
+		if err := c.refillBuffer(); err != nil {
+			return "", err
 		}
-		return s, nil
 	}
 
+	s := c.buffer[0] + "\n"
+
+	if len(c.buffer) > 1 {
+		c.buffer = c.buffer[1:]
+	} else if c.eof {
+		return s, io.EOF
+	} else {
+		c.buffer = []string{}
+	}
+
+	return s, nil
+
+}
+
+func (c *Cursor) refillBuffer() error {
 	var resp []Response
 	var err error
 
@@ -39,25 +53,29 @@ func (c *Cursor) Read() (string, error) {
 		attempts++
 		if resp, c.eof, err = c.client.retrieveNextResponseCtx(context.Background(), c); err != nil {
 			err = errors.Wrapf(err, "cursor.Read: %s", c.ID)
-			return "", err
+			return err
 		}
 	}
 
-	if c.eof || (len(resp) == 1 && &resp[0].Status != nil && resp[0].Status.Code == 204) {
-		return "", io.EOF
+	//gremlin has returned a validly formed 'no content' response
+	if len(resp) == 1 && &resp[0].Status != nil && resp[0].Status.Code == 204 {
+		return io.ErrUnexpectedEOF
 	}
 
 	if c.buffer, err = graphson.DeserializeStringListFromBytes(resp[0].Result.Data); err != nil {
-		return "", err
+		return err
 	}
 
 	if len(c.buffer) == 0 {
-		return "", errors.New("no results deserialized")
+		return errors.New("no results deserialized")
 	}
 
-	return c.Read()
+	return nil
 }
 
+// Close satisfies the ReadCloser interface. The cursor does not need to close any
+// resources, as the contained client holds the connection, and this is closed
+// by the defered close in OpenCursorCtx
 func (c *Cursor) Close(ctx context.Context) error {
 	return nil
 }
