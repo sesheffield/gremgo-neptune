@@ -85,8 +85,8 @@ func marshalResponse(msg []byte) (resp Response, err error) {
 // saveResponse makes the response (and its err) available for retrieval by the requester.
 // Mutexes are used for thread safety.
 func (c *Client) saveResponse(resp Response, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	var newdata []interface{}
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
@@ -166,9 +166,9 @@ func (c *Client) retrieveResponseCtx(ctx context.Context, id string) (data []Res
 // retrieveNextResponseCtx retrieves the current response (may be empty!) saved by saveResponse,
 //  `done` is true when the results are complete (eof)
 func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (data []Response, done bool, err error) {
-	c.mu.Lock()
+	c.Lock()
 	respNotifier, ok := c.responseNotifier.Load(cursor.ID)
-	c.mu.Unlock()
+	c.Unlock()
 	if respNotifier == nil || !ok {
 		return
 	}
@@ -187,10 +187,10 @@ func (c *Client) retrieveNextResponseCtx(ctx context.Context, cursor Cursor) (da
 		data = c.getCurrentResults(cursor.ID)
 		done = true
 	case <-chunkNotifier:
-		c.mu.Lock()
+		c.Lock()
 		data = c.getCurrentResults(cursor.ID)
 		c.deleteResponse(cursor.ID)
-		c.mu.Unlock()
+		c.Unlock()
 	case <-ctx.Done():
 		err = ctx.Err()
 	}

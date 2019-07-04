@@ -1,8 +1,12 @@
 # gremgo-neptune
 
+<<<<<<< HEAD
 [![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/ONSdigital/gremgo-neptune)
 [![Build Status](https://travis-ci.org/ONSdigital/gremgo-neptune.svg?branch=master)](https://travis-ci.org/ONSdigital/gremgo-neptune)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ONSdigital/gremgo-neptune)](https://goreportcard.com/report/github.com/ONSdigital/gremgo-neptune)
+=======
+[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/ONSdigital/gremgo-neptune) [![Build Status](https://travis-ci.org/ONSdigital/gremgo-neptune.svg?branch=master)](https://travis-ci.org/ONSdigital/gremgo-neptune) [![Go Report Card](https://goreportcard.com/badge/github.com/ONSdigital/gremgo-neptune)](https://goreportcard.com/report/github.com/ONSdigital/gremgo-neptune)
+>>>>>>> master
 
 gremgo-neptune is a fork of [qasaur/gremgo](https://github.com/qasaur/gremgo) with alterations to make it compatible with [AWS Neptune](https://aws.amazon.com/neptune/) which is a "Fast, reliable graph database built for the cloud".
 
@@ -17,12 +21,59 @@ go get github.com/ONSdigital/gremgo-neptune
 dep ensure
 ```
 
+<<<<<<< HEAD
 Development
 ====
 
 If you amend the `dialer` interface, please run:
 ```
 go generate
+=======
+Documentation
+==========
+
+* [GoDoc](https://godoc.org/github.com/ONSdigital/gremgo-neptune)
+
+Example
+==========
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/ONSdigital/gremgo-neptune"
+)
+
+func main() {
+    errs := make(chan error)
+    go func(chan error) {
+        err := <-errs
+        log.Fatal("Lost connection to the database: " + err.Error())
+    }(errs) // Example of connection error handling logic
+
+    dialer := gremgo.NewDialer("ws://127.0.0.1:8182") // Returns a WebSocket dialer to connect to Gremlin Server
+    g, err := gremgo.Dial(dialer, errs) // Returns a gremgo client to interact with
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    res, err := g.Execute( // Sends a query to Gremlin Server
+        "g.V('1234')"
+    )
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    j, err := json.Marshal(res[0].Result.Data) // res will return a list of resultsets,  where the data is a json.RawMessage
+    if err != nil {
+        fmt.Println(err)
+        return nil, err
+    }
+    fmt.Printf("%s", j)
+}
+>>>>>>> master
 ```
 
 Documentation
@@ -30,6 +81,7 @@ Documentation
 
 * [GoDoc](https://godoc.org/github.com/ONSdigital/gremgo-neptune)
 
+<<<<<<< HEAD
 Examples
 ==========
 
@@ -38,6 +90,39 @@ Examples
 - [authentication example](examples/authentication/main.go)
   - The plugin accepts authentication creating a secure dialer where credentials are set.
     If the server needs authentication and you do not provide the credentials the complement will panic.
+=======
+    "github.com/ONSdigital/gremgo-neptune"
+)
+
+func main() {
+    errs := make(chan error)
+    go func(chan error) {
+        err := <-errs
+        log.Fatal("Lost connection to the database: " + err.Error())
+    }(errs) // Example of connection error handling logic
+
+    dialer := gremgo.NewSecureDialer("127.0.0.1:8182", "username", "password") // Returns a WebSocket dialer to connect to Gremlin Server
+    g, err := gremgo.Dial(dialer, errs) // Returns a gremgo client to interact with
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    res, err := g.Execute( // Sends a query to Gremlin Server
+        "g.V('1234')"
+    )
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    j, err := json.Marshal(res[0].Result.Data) // res will return a list of resultsets,  where the data is a json.RawMessage
+    if err != nil {
+        fmt.Println(err)
+        return nil, err
+    }
+    fmt.Printf("%s", j)
+}
+```
+>>>>>>> master
 
 License
 ==========
