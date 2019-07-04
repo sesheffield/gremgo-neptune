@@ -9,12 +9,12 @@ import (
 )
 
 var (
+	lockdialerMockIsConnected sync.RWMutex
+	lockdialerMockIsDisposed  sync.RWMutex
 	lockdialerMockclose       sync.RWMutex
 	lockdialerMockconnect     sync.RWMutex
 	lockdialerMockconnectCtx  sync.RWMutex
 	lockdialerMockgetAuth     sync.RWMutex
-	lockdialerMockisConnected sync.RWMutex
-	lockdialerMockisDisposed  sync.RWMutex
 	lockdialerMockping        sync.RWMutex
 	lockdialerMockpingCtx     sync.RWMutex
 	lockdialerMockread        sync.RWMutex
@@ -32,6 +32,12 @@ var _ dialer = &dialerMock{}
 //
 //         // make and configure a mocked dialer
 //         mockeddialer := &dialerMock{
+//             IsConnectedFunc: func() bool {
+// 	               panic("mock out the IsConnected method")
+//             },
+//             IsDisposedFunc: func() bool {
+// 	               panic("mock out the IsDisposed method")
+//             },
 //             closeFunc: func() error {
 // 	               panic("mock out the close method")
 //             },
@@ -43,12 +49,6 @@ var _ dialer = &dialerMock{}
 //             },
 //             getAuthFunc: func() *auth {
 // 	               panic("mock out the getAuth method")
-//             },
-//             isConnectedFunc: func() bool {
-// 	               panic("mock out the isConnected method")
-//             },
-//             isDisposedFunc: func() bool {
-// 	               panic("mock out the isDisposed method")
 //             },
 //             pingFunc: func(errs chan error)  {
 // 	               panic("mock out the ping method")
@@ -72,6 +72,12 @@ var _ dialer = &dialerMock{}
 //
 //     }
 type dialerMock struct {
+	// IsConnectedFunc mocks the IsConnected method.
+	IsConnectedFunc func() bool
+
+	// IsDisposedFunc mocks the IsDisposed method.
+	IsDisposedFunc func() bool
+
 	// closeFunc mocks the close method.
 	closeFunc func() error
 
@@ -83,12 +89,6 @@ type dialerMock struct {
 
 	// getAuthFunc mocks the getAuth method.
 	getAuthFunc func() *auth
-
-	// isConnectedFunc mocks the isConnected method.
-	isConnectedFunc func() bool
-
-	// isDisposedFunc mocks the isDisposed method.
-	isDisposedFunc func() bool
 
 	// pingFunc mocks the ping method.
 	pingFunc func(errs chan error)
@@ -107,6 +107,12 @@ type dialerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// IsConnected holds details about calls to the IsConnected method.
+		IsConnected []struct {
+		}
+		// IsDisposed holds details about calls to the IsDisposed method.
+		IsDisposed []struct {
+		}
 		// close holds details about calls to the close method.
 		close []struct {
 		}
@@ -120,12 +126,6 @@ type dialerMock struct {
 		}
 		// getAuth holds details about calls to the getAuth method.
 		getAuth []struct {
-		}
-		// isConnected holds details about calls to the isConnected method.
-		isConnected []struct {
-		}
-		// isDisposed holds details about calls to the isDisposed method.
-		isDisposed []struct {
 		}
 		// ping holds details about calls to the ping method.
 		ping []struct {
@@ -155,6 +155,58 @@ type dialerMock struct {
 			In1 []byte
 		}
 	}
+}
+
+// IsConnected calls IsConnectedFunc.
+func (mock *dialerMock) IsConnected() bool {
+	if mock.IsConnectedFunc == nil {
+		panic("dialerMock.IsConnectedFunc: method is nil but dialer.IsConnected was just called")
+	}
+	callInfo := struct {
+	}{}
+	lockdialerMockIsConnected.Lock()
+	mock.calls.IsConnected = append(mock.calls.IsConnected, callInfo)
+	lockdialerMockIsConnected.Unlock()
+	return mock.IsConnectedFunc()
+}
+
+// IsConnectedCalls gets all the calls that were made to IsConnected.
+// Check the length with:
+//     len(mockeddialer.IsConnectedCalls())
+func (mock *dialerMock) IsConnectedCalls() []struct {
+} {
+	var calls []struct {
+	}
+	lockdialerMockIsConnected.RLock()
+	calls = mock.calls.IsConnected
+	lockdialerMockIsConnected.RUnlock()
+	return calls
+}
+
+// IsDisposed calls IsDisposedFunc.
+func (mock *dialerMock) IsDisposed() bool {
+	if mock.IsDisposedFunc == nil {
+		panic("dialerMock.IsDisposedFunc: method is nil but dialer.IsDisposed was just called")
+	}
+	callInfo := struct {
+	}{}
+	lockdialerMockIsDisposed.Lock()
+	mock.calls.IsDisposed = append(mock.calls.IsDisposed, callInfo)
+	lockdialerMockIsDisposed.Unlock()
+	return mock.IsDisposedFunc()
+}
+
+// IsDisposedCalls gets all the calls that were made to IsDisposed.
+// Check the length with:
+//     len(mockeddialer.IsDisposedCalls())
+func (mock *dialerMock) IsDisposedCalls() []struct {
+} {
+	var calls []struct {
+	}
+	lockdialerMockIsDisposed.RLock()
+	calls = mock.calls.IsDisposed
+	lockdialerMockIsDisposed.RUnlock()
+	return calls
 }
 
 // close calls closeFunc.
@@ -263,58 +315,6 @@ func (mock *dialerMock) getAuthCalls() []struct {
 	lockdialerMockgetAuth.RLock()
 	calls = mock.calls.getAuth
 	lockdialerMockgetAuth.RUnlock()
-	return calls
-}
-
-// isConnected calls isConnectedFunc.
-func (mock *dialerMock) isConnected() bool {
-	if mock.isConnectedFunc == nil {
-		panic("dialerMock.isConnectedFunc: method is nil but dialer.isConnected was just called")
-	}
-	callInfo := struct {
-	}{}
-	lockdialerMockisConnected.Lock()
-	mock.calls.isConnected = append(mock.calls.isConnected, callInfo)
-	lockdialerMockisConnected.Unlock()
-	return mock.isConnectedFunc()
-}
-
-// isConnectedCalls gets all the calls that were made to isConnected.
-// Check the length with:
-//     len(mockeddialer.isConnectedCalls())
-func (mock *dialerMock) isConnectedCalls() []struct {
-} {
-	var calls []struct {
-	}
-	lockdialerMockisConnected.RLock()
-	calls = mock.calls.isConnected
-	lockdialerMockisConnected.RUnlock()
-	return calls
-}
-
-// isDisposed calls isDisposedFunc.
-func (mock *dialerMock) isDisposed() bool {
-	if mock.isDisposedFunc == nil {
-		panic("dialerMock.isDisposedFunc: method is nil but dialer.isDisposed was just called")
-	}
-	callInfo := struct {
-	}{}
-	lockdialerMockisDisposed.Lock()
-	mock.calls.isDisposed = append(mock.calls.isDisposed, callInfo)
-	lockdialerMockisDisposed.Unlock()
-	return mock.isDisposedFunc()
-}
-
-// isDisposedCalls gets all the calls that were made to isDisposed.
-// Check the length with:
-//     len(mockeddialer.isDisposedCalls())
-func (mock *dialerMock) isDisposedCalls() []struct {
-} {
-	var calls []struct {
-	}
-	lockdialerMockisDisposed.RLock()
-	calls = mock.calls.isDisposed
-	lockdialerMockisDisposed.RUnlock()
 	return calls
 }
 

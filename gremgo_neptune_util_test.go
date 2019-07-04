@@ -3,7 +3,6 @@ package gremgo
 import (
 	"fmt"
 	"log"
-	"time"
 )
 
 var g *Client
@@ -50,10 +49,6 @@ func initPool() {
 		}
 		return &c, err
 	}
-	pool := Pool{
-		Dial:        dialFn,
-		MaxActive:   10,
-		IdleTimeout: time.Duration(10 * time.Second),
-	}
-	gp = &pool
+
+	gp = NewPool(dialFn)
 }
