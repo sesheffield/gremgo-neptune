@@ -27,13 +27,13 @@ type vert struct {
 type vert2 struct {
 	ID   string   `graph:"id,string"`
 	Vals []string `graph:"val,[]string"`
-	More int64    `graph:"num,number"`
+	More int32    `graph:"num,number"`
 }
 type ResultVert struct {
 	ID       string
 	Labels   []string
 	propVals map[string][]string
-	propNums map[string][]int64
+	propNums map[string][]int32
 	propMaps map[string]map[string][]string
 }
 type ResultMeta struct {
@@ -181,8 +181,8 @@ func compareVertices(prefix string, res []graphson.Vertex, expectMeta []ResultVe
 		}
 
 		for propKey, expectNums := range expectV.propNums {
-			gotPropNum, errSingle := v.GetPropertyInt64(propKey)
-			gotPropNums, errMulti := v.GetMultiPropertyInt64(propKey)
+			gotPropNum, errSingle := v.GetPropertyInt32(propKey)
+			gotPropNums, errMulti := v.GetMultiPropertyInt32(propKey)
 
 			if len(expectNums) == 0 {
 				if errSingle == nil {
@@ -341,7 +341,7 @@ func TestVert(t *testing.T) {
 								`{"@type":"g:VertexProperty","@value":{"id":{"@type":"Type","@value": 1},"value":"mapkey-val1","label":"mapkey-sub1"}},` +
 								`{"@type":"g:VertexProperty","@value":{"id":{"@type":"Type","@value": 2},"value":"mapkey-val2","label":"mapkey-sub2"}}` +
 								`],` +
-								`"num":[{"@type":"g:VertexProperty","@value":{"id":{"@type":"Type","@value": 1},"value":{"@type":"g:Int64","@value":1234},"label":"num"}}]` +
+								`"num":[{"@type":"g:VertexProperty","@value":{"id":{"@type":"Type","@value": 1},"value":{"@type":"g:Int32","@value":1234},"label":"num"}}]` +
 								`}}}]}`),
 						},
 					},
@@ -355,7 +355,7 @@ func TestVert(t *testing.T) {
 						propVals: map[string][]string{
 							"p2": {"1212", "3131"},
 						},
-						propNums: map[string][]int64{
+						propNums: map[string][]int32{
 							"num": {1234},
 						},
 						propMaps: map[string]map[string][]string{
@@ -530,7 +530,7 @@ func TestCursor(t *testing.T) {
 							propVals: map[string][]string{
 								"p2": {"1212", "3131"},
 							},
-							propNums: map[string][]int64{
+							propNums: map[string][]int32{
 								"num": {1234},
 							},
 						},
