@@ -18,6 +18,8 @@ func main() {
 	}(errs) // Example of connection error handling logic
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1*time.Minute))
+	defer cancel()
+
 	pool := gremgo.NewPoolWithDialerCtx(ctx, "ws://127.0.0.1:8182/gremlin", errs)
 
 	cursor, err := pool.OpenCursorCtx( // Sends a query to Gremlin Server with bindings
