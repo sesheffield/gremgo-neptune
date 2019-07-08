@@ -1,8 +1,10 @@
-package gremgo
+package gremgo_test
 
 import (
 	"fmt"
 	"log"
+
+	. "github.com/ONSdigital/gremgo-neptune"
 )
 
 var g *Client

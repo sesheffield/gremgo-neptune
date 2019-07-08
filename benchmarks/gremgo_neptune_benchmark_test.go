@@ -1,7 +1,9 @@
-package gremgo
+package gremgo_test
 
 import (
 	"testing"
+
+	. "github.com/ONSdigital/gremgo-neptune"
 )
 
 func init() {

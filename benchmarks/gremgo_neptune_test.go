@@ -1,4 +1,4 @@
-package gremgo
+package gremgo_test
 
 import (
 	"context"
