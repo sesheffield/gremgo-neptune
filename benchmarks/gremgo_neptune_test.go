@@ -1,6 +1,7 @@
-package gremgo
+package gremgo_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -11,7 +12,7 @@ func init() {
 
 func truncateData(t *testing.T) {
 	t.Logf("Removing all data from gremlin server")
-	r, err := g.Execute(`g.V().drop().iterate()`)
+	r, err := g.Execute(`g.V().drop().iterate()`, nil, nil)
 	t.Logf("Removed all vertices, response: %v+ \n err: %s", r, err)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +34,7 @@ func seedData(t *testing.T) {
 		  addE('brother').
 			from('x').
 			to('y')
-	`)
+	`, nil, nil)
 	t.Logf("Added two vertices and one edge, response: %v+ \n err: %s", r, err)
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +47,7 @@ type nodeLabels struct {
 
 func TestExecute(t *testing.T) {
 	seedData(t)
-	r, err := g.Execute(`g.V('1234').label()`)
+	r, err := g.Execute(`g.V('1234').label()`, nil, nil)
 	t.Logf("Execute get vertex, response: %s \n err: %s", r[0].Result.Data, err)
 	nl := new(nodeLabels)
 	err = json.Unmarshal(r[0].Result.Data, &nl)
@@ -62,7 +63,8 @@ func TestExecute(t *testing.T) {
 
 func TestExecuteWithBindings(t *testing.T) {
 	seedData(t)
-	r, err := g.ExecuteWithBindings(
+	r, err := g.ExecuteCtx(
+		context.Background(),
 		`g.V(x).label()`,
 		map[string]string{"x": "1234"},
 		map[string]string{},
@@ -82,7 +84,7 @@ func TestExecuteWithBindings(t *testing.T) {
 
 func TestExecuteFile(t *testing.T) {
 	seedData(t)
-	r, err := g.ExecuteFile("scripts/test.groovy")
+	r, err := g.ExecuteFile("scripts/test.groovy", nil, nil)
 	t.Logf("ExecuteFile get vertex, response: %s \n err: %s", r[0].Result.Data, err)
 	nl := new(nodeLabels)
 	err = json.Unmarshal(r[0].Result.Data, &nl)
@@ -98,7 +100,8 @@ func TestExecuteFile(t *testing.T) {
 
 func TestExecuteFileWithBindings(t *testing.T) {
 	seedData(t)
-	r, err := g.ExecuteFileWithBindings(
+	r, err := g.ExecuteCtx(
+		context.Background(),
 		"scripts/test-wbindings.groovy",
 		map[string]string{"x": "2145"},
 		map[string]string{},
@@ -118,7 +121,7 @@ func TestExecuteFileWithBindings(t *testing.T) {
 
 func TestPoolExecute(t *testing.T) {
 	seedData(t)
-	r, err := gp.Execute(`g.V('1234').label()`)
+	r, err := gp.Execute(`g.V('1234').label()`, nil, nil)
 	t.Logf("PoolExecute get vertex, response: %s \n err: %s", r[0].Result.Data, err)
 	nl := new(nodeLabels)
 	err = json.Unmarshal(r[0].Result.Data, &nl)

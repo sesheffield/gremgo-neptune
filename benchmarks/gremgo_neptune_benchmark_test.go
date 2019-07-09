@@ -1,7 +1,9 @@
-package gremgo
+package gremgo_test
 
 import (
 	"testing"
+
+	. "github.com/ONSdigital/gremgo-neptune"
 )
 
 func init() {
@@ -14,7 +16,7 @@ func init() {
 func benchmarkPoolExecute(i int, b *testing.B) {
 	for n := 0; n < i; n++ {
 		go func(p *Pool) {
-			_, err := p.Execute(`g.V('1234').label()`)
+			_, err := p.Execute(`g.V('1234').label()`, nil, nil)
 			if err != nil {
 				b.Error(err)
 			}

@@ -11,7 +11,7 @@ func TestRequestPreparation(t *testing.T) {
 	query := "g.V(x)"
 	bindings := map[string]string{"x": "10"}
 	rebindings := map[string]string{}
-	req, id, err := prepareRequestWithBindings(query, bindings, rebindings)
+	req, id, err := prepareRequest(query, bindings, rebindings)
 	if err != nil {
 		t.Error(err)
 	}
@@ -30,6 +30,7 @@ func TestRequestPreparation(t *testing.T) {
 
 	if reflect.DeepEqual(req, expectedRequest) != true {
 		t.Fail()
+		t.Logf("Want: %+v\nGot:  %+v\n", expectedRequest, req)
 	}
 }
 
