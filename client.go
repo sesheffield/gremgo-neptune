@@ -28,8 +28,8 @@ type Client struct {
 	results          *sync.Map
 	responseNotifier *sync.Map // responseNotifier notifies the requester that a response has been completed for the request
 	chunkNotifier    *sync.Map // chunkNotifier contains channels per requestID (if using cursors) which notifies the requester that a partial response has arrived
-	mu               sync.RWMutex
-	Errored          bool
+	sync.RWMutex
+	Errored bool
 }
 
 // NewDialer returns a WebSocket dialer to use when connecting to Gremlin Server
@@ -158,16 +158,15 @@ func (c *Client) Execute(query string, bindings, rebindings map[string]string) (
 	return c.ExecuteCtx(context.Background(), query, bindings, rebindings)
 }
 func (c *Client) ExecuteCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (resp []Response, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		return resp, ErrorConnectionDisposed
 	}
-	resp, err = c.executeRequestCtx(ctx, query, bindings, rebindings)
-	return
+	return c.executeRequestCtx(ctx, query, bindings, rebindings)
 }
 
 // ExecuteFile takes a file path to a Gremlin script, sends it to Gremlin Server, and returns the result.
 func (c *Client) ExecuteFile(path string, bindings, rebindings map[string]string) (resp []Response, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		return resp, ErrorConnectionDisposed
 	}
 	d, err := ioutil.ReadFile(path) // Read script from file
@@ -176,8 +175,7 @@ func (c *Client) ExecuteFile(path string, bindings, rebindings map[string]string
 		return
 	}
 	query := string(d)
-	resp, err = c.executeRequest(query, bindings, rebindings)
-	return
+	return c.executeRequest(query, bindings, rebindings)
 }
 
 // Get formats a raw Gremlin query, sends it to Gremlin Server, and populates the passed []interface.
@@ -187,7 +185,7 @@ func (c *Client) Get(query string, bindings, rebindings map[string]string) (res 
 
 // GetCtx - execute a gremlin command and return the response as vertices
 func (c *Client) GetCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (res []graphson.Vertex, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		err = ErrorConnectionDisposed
 		return
 	}
@@ -217,15 +215,11 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 
 // OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
 func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor *Cursor, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		err = ErrorConnectionDisposed
 		return
 	}
-
-	if cursor, err = c.executeRequestCursorCtx(ctx, query, bindings, rebindings); err != nil {
-		return
-	}
-	return
+	return c.executeRequestCursorCtx(ctx, query, bindings, rebindings)
 }
 
 // ReadCursorCtx returns the next set of results, deserialized as []Vertex, for the cursor
@@ -250,7 +244,7 @@ func (c *Client) GetE(query string, bindings, rebindings map[string]string) (res
 	return c.GetEdgeCtx(context.Background(), query, bindings, rebindings)
 }
 func (c *Client) GetEdgeCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (res []graphson.Edge, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		err = ErrorConnectionDisposed
 		return
 	}
@@ -413,7 +407,7 @@ func (c *Client) AddV(label string, data interface{}, bindings, rebindings map[s
 	return c.AddVertexCtx(context.Background(), label, data, bindings, rebindings)
 }
 func (c *Client) AddVertexCtx(ctx context.Context, label string, data interface{}, bindings, rebindings map[string]string) (vert graphson.Vertex, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		return vert, ErrorConnectionDisposed
 	}
 
@@ -451,7 +445,7 @@ func (c *Client) AddE(label, fromId, toId string, props map[string]interface{}) 
 	return c.AddEdgeCtx(context.Background(), label, fromId, toId, props)
 }
 func (c *Client) AddEdgeCtx(ctx context.Context, label, fromId, toId string, props map[string]interface{}) (resp interface{}, err error) {
-	if c.conn.isDisposed() {
+	if c.conn.IsDisposed() {
 		return nil, ErrorConnectionDisposed
 	}
 

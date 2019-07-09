@@ -105,7 +105,7 @@ func MockNewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error
 			msgChan <- message{0, nil, errors.New("readCtxFunc timeout")}
 		},
 		pingCtxFunc:    func(context.Context, chan error) { time.Sleep(5 * time.Second) },
-		isDisposedFunc: func() bool { return false },
+		IsDisposedFunc: func() bool { return false },
 	}
 	mockDialFunc := func() (*Client, error) {
 		var err error
