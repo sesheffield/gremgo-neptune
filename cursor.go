@@ -25,6 +25,10 @@ type Cursor struct {
 // is hardcoded in refillBuffer() to prevent an infinite wait for further responses.
 func (c *Cursor) Read() (string, error) {
 	if len(c.buffer) == 0 {
+		if c.eof {
+			return "", io.EOF
+		}
+
 		if err := c.refillBuffer(); err != nil {
 			return "", err
 		}
@@ -34,8 +38,6 @@ func (c *Cursor) Read() (string, error) {
 
 	if len(c.buffer) > 1 {
 		c.buffer = c.buffer[1:]
-	} else if c.eof {
-		return s, io.EOF
 	} else {
 		c.buffer = []string{}
 	}
