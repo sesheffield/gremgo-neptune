@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/ONSdigital/graphson"
 	"github.com/ONSdigital/gremgo-neptune"
-	"github.com/gedge/graphson"
 )
 
 func main() {

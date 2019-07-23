@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gedge/graphson"
+	"github.com/ONSdigital/graphson"
 	"github.com/pkg/errors"
 )
 
