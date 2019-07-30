@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gedge/graphson"
+	"github.com/ONSdigital/graphson"
 	"github.com/pkg/errors"
 )
 
