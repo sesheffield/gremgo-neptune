@@ -452,10 +452,10 @@ func TestVert(t *testing.T) {
 			v = make([]graphson.Vertex, 1)
 			v[0], err = p.AddVertexCtx(timeoutCtx, expect.vertLabel, expect.vert, nil, nil)
 		} else if expect.callType == "Get" {
-			var resp interface{}
+			var resp []graphson.Vertex
 			resp, err = p.GetCtx(timeoutCtx, "g.V()", nil, nil)
 			if err == nil {
-				for _, respN := range resp.([]graphson.Vertex) {
+				for _, respN := range resp {
 					v = append(v, respN)
 				}
 			}
