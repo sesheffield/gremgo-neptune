@@ -130,8 +130,7 @@ func (c *Client) executeRequestCursorCtx(ctx context.Context, query string, bind
 	}
 
 	cursor = &Cursor{
-		ID:     id,
-		client: c,
+		ID: id,
 	}
 	return
 }
@@ -211,6 +210,19 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 		res = append(res, resN...)
 	}
 	return
+}
+
+// OpenStreamCursor initiates a query on the database, returning a stream cursor used to iterate over the results as they arrive
+// The provided query must only return a string list, as the Read() function on Stream explicitely handles string values.
+func (c *Client) OpenStreamCursor(ctx context.Context, query string, bindings, rebindings map[string]string) (*Stream, error) {
+	if c.conn.IsDisposed() {
+		return nil, ErrorConnectionDisposed
+	}
+	basicCursor, err := c.executeRequestCursorCtx(ctx, query, bindings, rebindings)
+	return &Stream{
+		cursor: basicCursor,
+		client: c,
+	}, err
 }
 
 // OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
