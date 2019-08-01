@@ -212,8 +212,8 @@ func (c *Client) deserializeResponseToVertices(resp []Response) (res []graphson.
 	return
 }
 
-// OpenStreamCursor initiates a query on the database, returning a stream cursor used to iterate over the results as they arrive
-// The provided query must only return a string list, as the Read() function on Stream explicitely handles string values.
+// OpenStreamCursor initiates a query on the database, returning a stream cursor used to iterate over the results as they arrive.
+// The provided query must only return a string list, as the Read() function on Stream explicitly handles string values.
 func (c *Client) OpenStreamCursor(ctx context.Context, query string, bindings, rebindings map[string]string) (*Stream, error) {
 	if c.conn.IsDisposed() {
 		return nil, ErrorConnectionDisposed
@@ -225,7 +225,8 @@ func (c *Client) OpenStreamCursor(ctx context.Context, query string, bindings, r
 	}, err
 }
 
-// OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive
+// OpenCursorCtx initiates a query on the database, returning a cursor used to iterate over the results as they arrive.
+// The provided query must return a vertex or list of vertices in order for ReadCursorCtx to correctly format the results.
 func (c *Client) OpenCursorCtx(ctx context.Context, query string, bindings, rebindings map[string]string) (cursor *Cursor, err error) {
 	if c.conn.IsDisposed() {
 		err = ErrorConnectionDisposed
