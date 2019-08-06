@@ -375,7 +375,7 @@ func TestVert(t *testing.T) {
 				{
 					response: Response{
 						RequestID: "ook",
-						Status:    Status{Message: "ok", Code: statusPartialContent},
+						Status:    Status{Message: "ok", Code: StatusPartialContent},
 						Result: Result{
 							Meta: nil,
 							Data: json.RawMessage(`{"@type":"g:List","@value":[` +
@@ -544,7 +544,7 @@ func TestCursor(t *testing.T) {
 				{
 					response: Response{
 						RequestID: "ook",
-						Status:    Status{Message: "ok", Code: statusPartialContent},
+						Status:    Status{Message: "ok", Code: StatusPartialContent},
 						Result: Result{
 							Meta: nil,
 							Data: json.RawMessage(`{"@type":"g:List","@value":[` +
@@ -646,7 +646,7 @@ func TestCursor(t *testing.T) {
 				{
 					response: Response{
 						RequestID: "ook",
-						Status:    Status{Message: "OK", Code: statusPartialContent},
+						Status:    Status{Message: "OK", Code: StatusPartialContent},
 						Result: Result{
 							Meta: nil,
 							Data: json.RawMessage(`{"@type":"g:List","@value":[` +
