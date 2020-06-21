@@ -9,6 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+//go:generate moq -out retriever_moq_test.go . Retriever
+
+type Retriever interface {
+	retrieveNextResponseCtx(ctx context.Context, cursor *Cursor) (data []Response, done bool, err error)
+}
+
 // Cursor allows for results to be iterated over as soon as available, rather than waiting for
 // a query to complete and all results to be returned in one block.
 type Cursor struct {
@@ -22,7 +28,7 @@ type Stream struct {
 	cursor *Cursor
 	eof    bool
 	buffer []string
-	client *Client
+	client Retriever
 }
 
 // Read a string response from the stream cursor, reading from the buffer of previously retrieved responses
@@ -35,7 +41,9 @@ func (s *Stream) Read() (string, error) {
 		}
 
 		if err := s.refillBuffer(); err != nil {
-			return "", err
+			if err != io.EOF || len(s.buffer) == 0 {
+				return "", err
+			}
 		}
 	}
 
@@ -48,31 +56,37 @@ func (s *Stream) Read() (string, error) {
 }
 
 func (s *Stream) refillBuffer() error {
-	var resp []Response
+	var responses []Response
 	var err error
 
-	for resp == nil && !s.eof { //resp could be empty if reading too quickly
-		if resp, s.eof, err = s.client.retrieveNextResponseCtx(context.Background(), s.cursor); err != nil {
-			return errors.Wrapf(err, "cursor.Read: %s", s.cursor.ID)
-		}
+	for responses == nil && !s.eof { //responses could be empty if reading too quickly
 
-		if len(resp) > 1 {
-			return errors.New("too many results in cursor response")
+		if responses, s.eof, err = s.client.retrieveNextResponseCtx(context.Background(), s.cursor); err != nil {
+			return errors.Wrapf(err, "stream.refillBuffer: %s", s.cursor.ID)
 		}
 
 		//gremlin has returned a validly formed 'no content' response
-		if len(resp) == 1 && &resp[0].Status != nil && resp[0].Status.Code == http.StatusNoContent {
+		if len(responses) == 1 && &responses[0].Status != nil && responses[0].Status.Code == http.StatusNoContent {
 			s.eof = true
 			return io.EOF
 		}
 	}
 
-	if s.buffer, err = graphson.DeserializeStringListFromBytes(resp[0].Result.Data); err != nil {
-		return err
+	for _, response := range responses {
+		responseBytes, err := graphson.DeserializeStringListFromBytes(response.Result.Data)
+		if err != nil {
+			return err
+		}
+
+		s.buffer = append(s.buffer, responseBytes...)
+
+		if len(s.buffer) == 0 {
+			return errors.New("no results deserialized")
+		}
 	}
 
-	if len(s.buffer) == 0 {
-		return errors.New("no results deserialized")
+	if s.eof {
+		return io.EOF
 	}
 
 	return nil
