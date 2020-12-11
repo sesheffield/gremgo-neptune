@@ -36,7 +36,7 @@ func initClient() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	g = &r
+	g = r
 }
 
 func initPool() {
@@ -49,7 +49,7 @@ func initPool() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		return &c, err
+		return c, err
 	}
 
 	gp = NewPool(dialFn)
