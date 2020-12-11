@@ -86,7 +86,7 @@ func MockNewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error
 					var msgBytes []byte
 					var err error
 					if msgBytes, err = json.Marshal(resp.response); err != nil {
-						t.Errorf(err.Error())
+						t.Error(err.Error())
 						continue
 					}
 					// send response to saveWorkerCtx
@@ -127,18 +127,18 @@ func MockNewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error
 func compareVertices(prefix string, res []graphson.Vertex, expectMeta []ResultVert, t *testing.T) {
 	for idx, v := range res {
 		if idx+1 > len(expectMeta) {
-			t.Errorf(prefix+"Expected number of expectMeta (%d) is less than the number received (%d)", len(expectMeta), len(res))
+			t.Errorf("%sExpected number of expectMeta (%d) is less than the number received (%d)", prefix, len(expectMeta), len(res))
 			break
 		}
 		expectV := expectMeta[idx]
 
 		if v.GetID() != expectV.ID {
-			t.Errorf(prefix+"Expected id to be %q but got %q", expectV.ID, v.GetID())
+			t.Errorf("%sExpected id to be %q but got %q", prefix, expectV.ID, v.GetID())
 		}
 
 		labels := v.GetLabels()
 		if len(labels) != len(expectV.Labels) || strings.Join(labels, "@") != strings.Join(expectV.Labels, "@") {
-			t.Errorf(prefix+"Expected labels to be %+v but got %+v", expectV.Labels, labels)
+			t.Errorf("%sExpected labels to be %+v but got %+v", prefix, expectV.Labels, labels)
 		}
 
 		for propKey, expectVals := range expectV.propVals {
@@ -147,35 +147,35 @@ func compareVertices(prefix string, res []graphson.Vertex, expectMeta []ResultVe
 
 			if len(expectVals) == 0 {
 				if errSingle == nil {
-					t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyNotFound but got vals %q", propKey, gotPropVal)
+					t.Errorf("%sExpected single-val property %q to return ErrorPropertyNotFound but got vals %q", prefix, propKey, gotPropVal)
 				} else if errSingle != graphson.ErrorPropertyNotFound {
-					t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyNotFound but got error %q", propKey, errSingle)
+					t.Errorf("%sExpected single-val property %q to return ErrorPropertyNotFound but got error %q", prefix, propKey, errSingle)
 				}
 				if errMulti == nil {
-					t.Errorf(prefix+"Expected multi-val property %q return ErrorPropertyNotFound but got vals %q", propKey, gotPropVals)
+					t.Errorf("%sExpected multi-val property %q return ErrorPropertyNotFound but got vals %q", prefix, propKey, gotPropVals)
 				} else if errMulti != graphson.ErrorPropertyNotFound {
-					t.Errorf(prefix+"Expected multi-val property %q to return ErrorPropertyNotFound but got error %q", propKey, errMulti)
+					t.Errorf("%sExpected multi-val property %q to return ErrorPropertyNotFound but got error %q", prefix, propKey, errMulti)
 				}
 
 			} else if len(expectVals) > 0 {
 				if len(expectVals) == 1 {
 					if errSingle != nil {
-						t.Errorf(prefix+"Expected single-val property %q to be %+v but got error %q", propKey, expectVals, errSingle)
+						t.Errorf("%sExpected single-val property %q to be %+v but got error %q", prefix, propKey, expectVals, errSingle)
 					} else if gotPropVal != expectVals[0] {
-						t.Errorf(prefix+"Expected single-val property %q to be %q but got %q", propKey, expectVals[0], gotPropVal)
+						t.Errorf("%sExpected single-val property %q to be %q but got %q", prefix, propKey, expectVals[0], gotPropVal)
 					}
 				} else {
 					if errSingle == nil {
-						t.Errorf(prefix+"Expected single-val property %q to return error for expected %+v but got %q", propKey, expectVals, gotPropVal)
+						t.Errorf("%sExpected single-val property %q to return error for expected %+v but got %q", prefix, propKey, expectVals, gotPropVal)
 					} else if errSingle != graphson.ErrorPropertyIsMulti && errSingle != graphson.ErrorPropertyIsMeta {
-						t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyIsM* for expected %+v but got error %q", propKey, expectVals, errSingle)
+						t.Errorf("%sExpected single-val property %q to return ErrorPropertyIsM* for expected %+v but got error %q", prefix, propKey, expectVals, errSingle)
 					}
 				}
 
 				if errMulti != nil {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got error %q", propKey, expectVals, errMulti)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got error %q", prefix, propKey, expectVals, errMulti)
 				} else if len(expectVals) != len(gotPropVals) || strings.Join(expectVals, "@") != strings.Join(gotPropVals, "@") {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got %+v", propKey, expectVals, gotPropVals)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got %+v", prefix, propKey, expectVals, gotPropVals)
 				}
 			}
 		}
@@ -186,35 +186,35 @@ func compareVertices(prefix string, res []graphson.Vertex, expectMeta []ResultVe
 
 			if len(expectNums) == 0 {
 				if errSingle == nil {
-					t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyNotFound but got vals %q", propKey, gotPropNum)
+					t.Errorf("%sExpected single-val property %q to return ErrorPropertyNotFound but got vals %q", prefix, propKey, gotPropNum)
 				} else if errSingle != graphson.ErrorPropertyNotFound {
-					t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyNotFound but got error %q", propKey, errSingle)
+					t.Errorf("%sExpected single-val property %q to return ErrorPropertyNotFound but got error %q", prefix, propKey, errSingle)
 				}
 				if errMulti == nil {
-					t.Errorf(prefix+"Expected multi-val property %q return ErrorPropertyNotFound but got vals %q", propKey, gotPropNums)
+					t.Errorf("%sExpected multi-val property %q return ErrorPropertyNotFound but got vals %q", prefix, propKey, gotPropNums)
 				} else if errMulti != graphson.ErrorPropertyNotFound {
-					t.Errorf(prefix+"Expected multi-val property %q to return ErrorPropertyNotFound but got error %q", propKey, errMulti)
+					t.Errorf("%sExpected multi-val property %q to return ErrorPropertyNotFound but got error %q", prefix, propKey, errMulti)
 				}
 
 			} else if len(expectNums) > 0 {
 				if len(expectNums) == 1 {
 					if errSingle != nil {
-						t.Errorf(prefix+"Expected single-val property %q to be %+v but got error %q", propKey, expectNums, errSingle)
+						t.Errorf("%sExpected single-val property %q to be %+v but got error %q", prefix, propKey, expectNums, errSingle)
 					} else if gotPropNum != expectNums[0] {
-						t.Errorf(prefix+"Expected single-val property %q to be %q but got %q", propKey, expectNums[0], gotPropNum)
+						t.Errorf("%sExpected single-val property %q to be %q but got %q", prefix, propKey, expectNums[0], gotPropNum)
 					}
 				} else {
 					if errSingle == nil {
-						t.Errorf(prefix+"Expected single-val property %q to return error for expected %+v but got %q", propKey, expectNums, gotPropNum)
+						t.Errorf("%sExpected single-val property %q to return error for expected %+v but got %q", prefix, propKey, expectNums, gotPropNum)
 					} else if errSingle != graphson.ErrorPropertyIsMulti && errSingle != graphson.ErrorPropertyIsMeta {
-						t.Errorf(prefix+"Expected single-val property %q to return ErrorPropertyIsM* for expected %+v but got error %q", propKey, expectNums, errSingle)
+						t.Errorf("%sExpected single-val property %q to return ErrorPropertyIsM* for expected %+v but got error %q", prefix, propKey, expectNums, errSingle)
 					}
 				}
 
 				if errMulti != nil {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got error %q", propKey, expectNums, errMulti)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got error %q", prefix, propKey, expectNums, errMulti)
 				} else if len(expectNums) != len(gotPropNums) || fmt.Sprintf("%+v", expectNums) != fmt.Sprintf("%+v", gotPropNums) {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got %+v", propKey, expectNums, gotPropNums)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got %+v", prefix, propKey, expectNums, gotPropNums)
 				}
 			}
 		}
@@ -223,15 +223,15 @@ func compareVertices(prefix string, res []graphson.Vertex, expectMeta []ResultVe
 			gotPropMap, errMap := v.GetMetaProperty(propKey)
 			if len(expectVals) == 0 {
 				if errMap == nil {
-					t.Errorf(prefix+"Expected multi-val property %q return ErrorPropertyNotFound but got vals %q", propKey, gotPropMap)
+					t.Errorf("%sExpected multi-val property %q return ErrorPropertyNotFound but got vals %q", prefix, propKey, gotPropMap)
 				} else if errMap != graphson.ErrorPropertyNotFound {
-					t.Errorf(prefix+"Expected multi-val property %q to return ErrorPropertyNotFound but got error %q", propKey, errMap)
+					t.Errorf("%sExpected multi-val property %q to return ErrorPropertyNotFound but got error %q", prefix, propKey, errMap)
 				}
 			} else if len(expectVals) > 0 {
 				if errMap != nil {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got error %q", propKey, expectVals, errMap)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got error %q", prefix, propKey, expectVals, errMap)
 				} else if len(expectVals) != len(gotPropMap) || fmt.Sprintf("%+v", expectVals) != fmt.Sprintf("%+v", gotPropMap) {
-					t.Errorf(prefix+"Expected multi-val property %q to be %+v but got %+v", propKey, expectVals, gotPropMap)
+					t.Errorf("%sExpected multi-val property %q to be %+v but got %+v", prefix, propKey, expectVals, gotPropMap)
 				}
 			}
 		}
@@ -466,23 +466,23 @@ func TestVert(t *testing.T) {
 		if err != nil {
 			if expect.expectMeta.err != nil {
 				if strings.Index(err.Error(), expect.expectMeta.err.Error()) == -1 {
-					t.Errorf(testPrefix+"Expected err to be %q, but got: %s", expect.expectMeta.err, err)
+					t.Errorf("%sExpected err to be %q, but got: %s", testPrefix, expect.expectMeta.err, err)
 				}
 			} else {
-				t.Errorf(testPrefix+"Expected err to be nil, but got: %s", err)
+				t.Errorf("%sExpected err to be nil, but got: %s", testPrefix, err)
 			}
 			continue
 		}
 		if expect.expectMeta.err != nil {
-			t.Errorf(testPrefix+"Expected err to be %q, but got %v", expect.expectMeta.err, err)
+			t.Errorf("%sExpected err to be %q, but got %v", testPrefix, expect.expectMeta.err, err)
 			continue
 		}
 
 		if len(dialMock.writeCalls()) != 1 {
-			t.Errorf(testPrefix+"Expected number of calls to write() (%d) != 1 (expected)", len(dialMock.writeCalls()))
+			t.Errorf("%sExpected number of calls to write() (%d) != 1 (expected)", testPrefix, len(dialMock.writeCalls()))
 		}
 		if len(dialMock.readCtxCalls()) != 1 {
-			t.Errorf(testPrefix+"Expected number of calls to readCtx() (%d) != 1 (expected)", len(dialMock.readCtxCalls()))
+			t.Errorf("%sExpected number of calls to readCtx() (%d) != 1 (expected)", testPrefix, len(dialMock.readCtxCalls()))
 		}
 
 		compareVertices(testPrefix, v, expect.expectMeta.verts, t)
@@ -696,7 +696,7 @@ func TestCursor(t *testing.T) {
 
 		cursor, err := p.OpenCursorCtx(timeoutCtx, "g.V()", nil, nil)
 		if err != nil {
-			t.Errorf(testPrefix+"Expected OpenCursorCtx err to be nil, but got: %s", err)
+			t.Errorf("%sExpected OpenCursorCtx err to be nil, but got: %s", testPrefix, err)
 		}
 		cancel()
 
@@ -716,16 +716,16 @@ func TestCursor(t *testing.T) {
 			if err != nil {
 				if expect.expectMeta[idx].err != nil {
 					if strings.Index(err.Error(), expect.expectMeta[idx].err.Error()) == -1 {
-						t.Errorf(testPrefix+"Expected err to be %q, but got: %s", expect.expectMeta[idx].err, err)
+						t.Errorf("%sExpected err to be %q, but got: %s", testPrefix, expect.expectMeta[idx].err, err)
 					}
 					break
 				} else {
-					t.Errorf(testPrefix+"Expected ReadCursorCtx err to be nil, but got: %s", err)
+					t.Errorf("%sExpected ReadCursorCtx err to be nil, but got: %s", testPrefix, err)
 					break
 				}
 			}
 			if expect.expectMeta[idx].err != nil {
-				t.Errorf(testPrefix+"Expected err to be %q, but got nil", expect.expectMeta[idx].err)
+				t.Errorf("%sExpected err to be %q, but got nil", testPrefix, expect.expectMeta[idx].err)
 				continue
 			}
 
@@ -736,18 +736,18 @@ func TestCursor(t *testing.T) {
 			}
 			idx++
 			if !eof && idx >= len(expect.expectMeta) {
-				t.Errorf(testPrefix+"Exceeded maximum expected cursor reads %d - giving up", idx+1)
+				t.Errorf("%sExceeded maximum expected cursor reads %d - giving up", testPrefix, idx+1)
 				break
 			}
 		}
 		if totalSeenVertices != expectedTotalVertices {
-			t.Errorf(testPrefix+"Expected total number of vertices received (%d) != %d (actual)", expectedTotalVertices, totalSeenVertices)
+			t.Errorf("%sExpected total number of vertices received (%d) != %d (actual)", testPrefix, expectedTotalVertices, totalSeenVertices)
 		}
 		if len(dialMock.writeCalls()) != 1 {
-			t.Errorf(testPrefix+"Expected number of calls to write() (1) != %d (actual)", len(dialMock.writeCalls()))
+			t.Errorf("%sExpected number of calls to write() (1) != %d (actual)", testPrefix, len(dialMock.writeCalls()))
 		}
 		if len(dialMock.readCtxCalls()) != 1 {
-			t.Errorf(testPrefix+"Expected number of calls to readCtx() (1) != %d (actual)", len(dialMock.readCtxCalls()))
+			t.Errorf("%sExpected number of calls to readCtx() (1) != %d (actual)", testPrefix, len(dialMock.readCtxCalls()))
 		}
 	}
 }
