@@ -86,7 +86,6 @@ func marshalResponse(msg []byte) (resp Response, err error) {
 // Mutexes are used for thread safety.
 func (c *Client) saveResponse(resp Response, err error) {
 	c.Lock()
-	defer c.Unlock()
 	var newdata []interface{}
 	existingData, ok := c.results.Load(resp.RequestID) // Retrieve old data container (for requests with multiple responses)
 	if ok {
@@ -96,13 +95,15 @@ func (c *Client) saveResponse(resp Response, err error) {
 		newdata = append(newdata, resp)
 	}
 	c.results.Store(resp.RequestID, newdata) // Add new data to buffer for future retrieval
-	respNotifier, _ := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
+	c.Unlock()
+
 	// err is from marshalResponse (json.Unmarshal), but is ignored when Code==statusPartialContent
 	if resp.Status.Code == StatusPartialContent {
 		if chunkNotifier, ok := c.chunkNotifier.Load(resp.RequestID); ok {
 			chunkNotifier.(chan bool) <- true
 		}
 	} else {
+		respNotifier, _ := c.responseNotifier.LoadOrStore(resp.RequestID, make(chan error, 1))
 		respNotifier.(chan error) <- err
 	}
 }
