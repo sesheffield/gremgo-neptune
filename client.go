@@ -28,7 +28,7 @@ type Client struct {
 	results          *sync.Map
 	responseNotifier *sync.Map // responseNotifier notifies the requester that a response has been completed for the request
 	chunkNotifier    *sync.Map // chunkNotifier contains channels per requestID (if using cursors) which notifies the requester that a partial response has arrived
-	sync.RWMutex
+	sync.Mutex
 	Errored bool
 }
 
@@ -51,22 +51,24 @@ func NewDialer(host string, configs ...DialerConfig) (dialer *Ws) {
 	return dialer
 }
 
-func newClient() (c Client) {
-	c.requests = make(chan []byte, 3)  // c.requests takes any request and delivers it to the WriteWorker for dispatch to Gremlin Server
-	c.responses = make(chan []byte, 3) // c.responses takes raw responses from ReadWorker and delivers it for sorting to handleResponse
-	c.results = &sync.Map{}
-	c.responseNotifier = &sync.Map{}
-	c.chunkNotifier = &sync.Map{}
-	return
+func newClient() (c *Client) {
+	return &Client{
+		requests:         make(chan []byte, 3), // c.requests takes any request and delivers it to the WriteWorker for dispatch to Gremlin Server
+		responses:        make(chan []byte, 3), // c.responses takes raw responses from ReadWorker and delivers it for sorting to handleResponse
+		results:          &sync.Map{},
+		responseNotifier: &sync.Map{},
+		chunkNotifier:    &sync.Map{},
+		Mutex:            sync.Mutex{},
+	}
 }
 
 // Dial returns a gremgo client for interaction with the Gremlin Server specified in the host IP.
-func Dial(conn dialer, errs chan error) (c Client, err error) {
+func Dial(conn dialer, errs chan error) (c *Client, err error) {
 	return DialCtx(context.Background(), conn, errs)
 }
 
 // DialCtx returns a gremgo client for interaction with the Gremlin Server specified in the host IP.
-func DialCtx(ctx context.Context, conn dialer, errs chan error) (c Client, err error) {
+func DialCtx(ctx context.Context, conn dialer, errs chan error) (c *Client, err error) {
 	c = newClient()
 	c.conn = conn
 

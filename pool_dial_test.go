@@ -43,7 +43,7 @@ type ResultMeta struct {
 
 func MockNewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error, t *testing.T, expectReq []byte, expectMeta []StaggeredResponse) (*Pool, *dialerMock) {
 	mockDBResponseChan := make(chan StaggeredResponse, 10)
-	var cli Client
+	var cli *Client
 	dialerMocked := &dialerMock{
 		connectCtxFunc: func(context.Context) error { return nil },
 		writeFunc: func(req []byte) error {
@@ -110,7 +110,7 @@ func MockNewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error
 	mockDialFunc := func() (*Client, error) {
 		var err error
 		cli, err = DialCtx(ctx, dialerMocked, errs)
-		return &cli, err
+		return cli, err
 	}
 	go func(errs chan error) {
 		for {

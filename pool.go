@@ -52,7 +52,7 @@ func NewPoolWithDialerCtx(ctx context.Context, dbURL string, errs chan error, cf
 	dialFunc := func() (*Client, error) {
 		dialer := NewDialer(dbURL, cfgs...)
 		cli, err := DialCtx(ctx, dialer, errs)
-		return &cli, err
+		return cli, err
 	}
 	return NewPool(dialFunc)
 }
