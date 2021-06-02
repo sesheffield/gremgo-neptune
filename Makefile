@@ -1,15 +1,19 @@
+SHELL=bash
 .DEFAULT_GOAL:= all
-
 .PHONY: all
 all: vet test
 
-.PHONY: vet
-vet:
-	@go vet -v
-
 .PHONY: test
 test:
-	@go test -v
+	go test -v -race -cover ./...
+
+.PHONY: audit
+audit:
+	go list -json -m all | nancy sleuth
+
+.PHONY: build
+build:
+	go build ./...
 
 .PHONY: test-bench
 test-bench:
