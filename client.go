@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/ONSdigital/graphson"
+	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
 
@@ -18,6 +20,11 @@ var (
 	ErrorConnectionDisposed      = errors.New("you cannot write on a disposed connection")
 	ErrorNoGraphTags             = errors.New("does not contain any graph tags")
 	ErrorUnsupportedPropertyType = errors.New("unsupported property map value type")
+	DefaultDialer                = websocket.Dialer{
+		WriteBufferSize:  512 * 1024,
+		ReadBufferSize:   512 * 1024,
+		HandshakeTimeout: 5 * time.Second, // Timeout or else we'll hang forever and never fail on bad hosts.
+	}
 )
 
 // Client is a container for the gremgo client.
@@ -35,12 +42,14 @@ type Client struct {
 // NewDialer returns a WebSocket dialer to use when connecting to Gremlin Server
 func NewDialer(host string, configs ...DialerConfig) (dialer *Ws) {
 	dialer = &Ws{
-		timeout:      15 * time.Second,
-		pingInterval: 60 * time.Second,
-		writingWait:  15 * time.Second,
-		readingWait:  15 * time.Second,
-		connected:    false,
-		quit:         make(chan struct{}),
+		timeout:        15 * time.Second,
+		pingInterval:   60 * time.Second,
+		writingWait:    15 * time.Second,
+		readingWait:    15 * time.Second,
+		connected:      false,
+		quit:           make(chan struct{}),
+		dialer:         DefaultDialer,
+		requestHeaders: http.Header{},
 	}
 
 	for _, conf := range configs {

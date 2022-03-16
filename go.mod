@@ -8,5 +8,4 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/pkg/errors v0.8.1
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 )

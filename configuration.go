@@ -1,6 +1,11 @@
 package gremgo
 
-import "time"
+import (
+	"net/http"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
 
 //DialerConfig is the struct for defining configuration for WebSocket dialer
 type DialerConfig func(*Ws)
@@ -38,5 +43,19 @@ func SetWritingWait(seconds int) DialerConfig {
 func SetReadingWait(seconds int) DialerConfig {
 	return func(c *Ws) {
 		c.readingWait = time.Duration(seconds) * time.Second
+	}
+}
+
+// SetDialer sets dialer options
+func SetDialer(d websocket.Dialer) DialerConfig {
+	return func(c *Ws) {
+		c.dialer = d
+	}
+}
+
+// SetRequestHeaders sets request headers
+func SetRequestHeaders(requestHeaders http.Header) DialerConfig {
+	return func(c *Ws) {
+		c.requestHeaders = requestHeaders
 	}
 }

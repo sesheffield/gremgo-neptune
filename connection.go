@@ -45,6 +45,8 @@ type Ws struct {
 	timeout      time.Duration
 	quit         chan struct{}
 	sync.RWMutex
+	dialer         websocket.Dialer
+	requestHeaders http.Header
 }
 
 //Auth is the container for authentication data of dialer
@@ -58,12 +60,7 @@ func (ws *Ws) connect() (err error) {
 }
 
 func (ws *Ws) connectCtx(ctx context.Context) (err error) {
-	d := websocket.Dialer{
-		WriteBufferSize:  512 * 1024,
-		ReadBufferSize:   512 * 1024,
-		HandshakeTimeout: 5 * time.Second, // Timeout or else we'll hang forever and never fail on bad hosts.
-	}
-	ws.conn, _, err = d.DialContext(ctx, ws.host, http.Header{})
+	ws.conn, _, err = ws.dialer.DialContext(ctx, ws.host, ws.requestHeaders)
 	if err != nil {
 		return
 	}
